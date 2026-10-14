@@ -1,4 +1,5 @@
 api_version = "2026-10"
+uid = "327367e1-4cf7-3b3b-55da-7e7b903aa2d38da65690"
 
 [[extensions]]
 name = "Trekiva Notify"
