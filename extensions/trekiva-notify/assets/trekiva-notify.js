@@ -142,14 +142,19 @@
     error.hidden = true;
     form.appendChild(error);
 
-    // Honeypot: invisible to people, tempting to bots.
+    // Honeypot: invisible to people, tempting to bots. Its name is deliberately not one a browser
+    // recognises ("website", "phone", ...): autofill would otherwise fill it along with the email and
+    // the signup would be thrown away as spam.
     var hpWrap = el("div", "tn-hp");
     hpWrap.setAttribute("aria-hidden", "true");
     var hp = el("input");
     hp.type = "text";
-    hp.name = "website";
+    hp.name = "tn_trap";
     hp.tabIndex = -1;
     hp.autocomplete = "off";
+    hp.setAttribute("data-lpignore", "true");
+    hp.setAttribute("data-1p-ignore", "true");
+    hp.setAttribute("data-form-type", "other");
     hpWrap.appendChild(hp);
     form.appendChild(hpWrap);
 
@@ -201,7 +206,7 @@
           email: value,
           pageType: ctx.pageType,
           marketingOptIn: optIn ? optIn.checked : false,
-          website: hp.value,
+          tnTrap: hp.value,
         }),
       })
         .then(function (res) {

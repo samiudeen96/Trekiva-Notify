@@ -83,6 +83,10 @@ export interface EmailConfig {
   body: string;
   buttonLabel: string;
   footer: string;
+  /** Logo shown at the top. Empty = the store's logo from Shopify branding, then the store name. */
+  logoUrl: string;
+  /** Button colour in the email. */
+  accentColor: string;
 }
 
 export const DEFAULT_EMAIL: EmailConfig = {
@@ -93,4 +97,6 @@ export const DEFAULT_EMAIL: EmailConfig = {
   body: "The item you asked about is available again. Stock is limited, so order soon.",
   buttonLabel: "Buy now",
   footer: "",
+  logoUrl: "",
+  accentColor: "#111111",
 };

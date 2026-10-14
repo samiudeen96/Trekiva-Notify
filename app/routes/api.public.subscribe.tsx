@@ -15,7 +15,7 @@ const bodySchema = z.object({
   pageType: z.string().max(20).optional(),
   marketingOptIn: z.boolean().optional(),
   // Honeypot: real visitors never see this field, bots fill it in.
-  website: z.string().optional(),
+  tnTrap: z.string().optional(),
 });
 
 const json = (body: object, status = 200) =>
@@ -33,7 +33,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!body.success) return json({ status: "invalid_email" }, 400);
 
   // Pretend success to bots so they learn nothing, but store nothing.
-  if (body.data.website) return json({ status: "subscribed" });
+  if (body.data.tnTrap) return json({ status: "subscribed" });
 
   const settings = await db.settings.findUnique({
     where: { shopDomain: session.shop },

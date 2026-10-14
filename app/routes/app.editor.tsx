@@ -6,6 +6,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { loadSettings, saveEditor } from "../settings/settings.server";
 import { editorSchema, fieldErrors, SHOW_ON, type EditorValues } from "../settings/schema";
+import { DEFAULT_BUTTON, DEFAULT_EMAIL, DEFAULT_FORM } from "../settings/defaults";
 import { ButtonPreview, EmailPreview, FormPreview, InboxPreview } from "../components/EditorPreview";
 
 const TABS = [
@@ -64,11 +65,14 @@ const RULE_HELP: Record<EditorValues["productRule"]["mode"], string> = {
 
 const gidOf = (type: "Product" | "Collection", id: string) => `gid://shopify/${type}/${id}`;
 
-function Group(props: { title: string; children: React.ReactNode }) {
+function Group(props: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <s-box padding="base" border="base" borderRadius="base">
+    <s-box padding="base" border="base" borderRadius="base" background="base">
       <s-stack gap="base">
-        <s-heading>{props.title}</s-heading>
+        <s-stack gap="small-300">
+          <s-heading>{props.title}</s-heading>
+          {props.hint && <s-text color="subdued">{props.hint}</s-text>}
+        </s-stack>
         {props.children}
       </s-stack>
     </s-box>
@@ -99,6 +103,15 @@ export default function Editor() {
   const setEmail = (p: Partial<EditorValues["email"]>) => setValues((v) => ({ ...v, email: { ...v.email, ...p } }));
   const setRule = (p: Partial<EditorValues["productRule"]>) =>
     setValues((v) => ({ ...v, productRule: { ...v.productRule, ...p } }));
+
+  // Puts the controls of the open tab back to the built-in defaults (not saved until Save is pressed).
+  const resetTab = () =>
+    setValues((v) => {
+      if (tab === "button") return { ...v, button: { ...DEFAULT_BUTTON }, showOn: ["product"], productRule: { mode: "ALL", ids: [], tags: [] } };
+      if (tab === "form") return { ...v, form: { ...DEFAULT_FORM } };
+      if (tab === "email") return { ...v, email: { ...v.email, heading: DEFAULT_EMAIL.heading, body: DEFAULT_EMAIL.body, buttonLabel: DEFAULT_EMAIL.buttonLabel, footer: DEFAULT_EMAIL.footer, logoUrl: DEFAULT_EMAIL.logoUrl, accentColor: DEFAULT_EMAIL.accentColor } };
+      return { ...v, email: { ...v.email, senderName: DEFAULT_EMAIL.senderName, subject: DEFAULT_EMAIL.subject, previewText: DEFAULT_EMAIL.previewText } };
+    });
 
   const save = () => {
     setSubmitted(JSON.stringify(values));
@@ -142,7 +155,7 @@ export default function Editor() {
           <s-stack gap="base">
             {tab === "button" && (
               <>
-                <Group title="Button customize">
+                <Group title="Button customize" hint="Text and colors of the button shown on sold-out products.">
                   <s-text-field label="Button text" value={values.button.text} error={errors["button.text"]}
                     onInput={(e: Event) => setButton({ text: val(e) })} />
                   <s-text-field label="Mixed stock subtext" value={values.button.mixedSubtext}
@@ -161,8 +174,8 @@ export default function Editor() {
                   </s-grid>
                 </Group>
 
-                <Group title="Show button on">
-                  <s-stack direction="inline" gap="base">
+                <Group title="Show button on" hint="Pick the pages where customers can ask to be notified.">
+                  <s-grid gridTemplateColumns="1fr 1fr" gap="small-200">
                     {SHOW_ON.map((p) => (
                       <s-checkbox key={p} label={PAGE_LABELS[p]} checked={values.showOn.includes(p)}
                         onChange={(e: Event) =>
@@ -172,10 +185,10 @@ export default function Editor() {
                           }))
                         } />
                     ))}
-                  </s-stack>
+                  </s-grid>
                 </Group>
 
-                <Group title="Product options">
+                <Group title="Product options" hint="Choose which sold-out products get the button.">
                   <s-choice-list label="Which sold-out products get the button" labelAccessibilityVisibility="exclusive"
                     name="rule" values={[mode]}
                     onChange={(e: Event) => {
@@ -208,7 +221,7 @@ export default function Editor() {
 
             {tab === "form" && (
               <>
-                <Group title="Form content">
+                <Group title="Form content" hint="The popup customers fill in after tapping the button.">
                   <s-text-field label="Header" value={values.form.header} error={errors["form.header"]} onInput={(e: Event) => setForm({ header: val(e) })} />
                   <s-text-field label="Description" value={values.form.description} onInput={(e: Event) => setForm({ description: val(e) })} />
                   <s-text-field label="Email placeholder" value={values.form.emailPlaceholder} error={errors["form.emailPlaceholder"]}
@@ -219,7 +232,7 @@ export default function Editor() {
                     onInput={(e: Event) => setForm({ buttonText: val(e) })} />
                   <s-text-field label="Terms message" value={values.form.terms} onInput={(e: Event) => setForm({ terms: val(e) })} />
                 </Group>
-                <Group title="Opt-in marketing">
+                <Group title="Opt-in marketing" hint="Adds a checkbox to the form. The choice is saved with the request.">
                   <s-checkbox label="Ask customers to receive marketing emails" checked={values.form.marketingOptIn}
                     onChange={(e: Event) => setForm({ marketingOptIn: checked(e) })} />
                   {values.form.marketingOptIn && (
@@ -227,7 +240,7 @@ export default function Editor() {
                       onInput={(e: Event) => setForm({ marketingLabel: val(e) })} />
                   )}
                 </Group>
-                <Group title="Confirm message">
+                <Group title="Confirm message" hint="Shown right after a customer signs up.">
                   <s-text-field label="Header" value={values.form.confirmHeader} error={errors["form.confirmHeader"]}
                     onInput={(e: Event) => setForm({ confirmHeader: val(e) })} />
                   <s-text-field label="Description" value={values.form.confirmDescription}
@@ -237,7 +250,13 @@ export default function Editor() {
             )}
 
             {tab === "email" && (
-              <Group title="Email content">
+              <Group title="Email content" hint="The message customers get when the item is back. The product photo, options and price are added automatically.">
+                <s-text-field label="Logo link (optional)" value={values.email.logoUrl} error={errors["email.logoUrl"]}
+                  placeholder="https://…/logo.png"
+                  details="A full https:// image link, about 400 px wide. Leave empty to use your store's logo from Shopify branding."
+                  onInput={(e: Event) => setEmail({ logoUrl: val(e) })} />
+                <s-color-field label="Button color" value={values.email.accentColor} error={errors["email.accentColor"]}
+                  onInput={(e: Event) => setEmail({ accentColor: val(e) })} />
                 <s-text-field label="Heading" value={values.email.heading} onInput={(e: Event) => setEmail({ heading: val(e) })} />
                 <s-text-area label="Message" rows={4} value={values.email.body} onInput={(e: Event) => setEmail({ body: val(e) })} />
                 <s-text-field label="Button label" value={values.email.buttonLabel} error={errors["email.buttonLabel"]}
@@ -250,7 +269,7 @@ export default function Editor() {
             )}
 
             {tab === "settings" && (
-              <Group title="Email settings">
+              <Group title="Email settings" hint="How the email appears in the inbox list.">
                 <s-text-field label="Sender name" value={values.email.senderName} placeholder="Your store"
                   details="Leave empty to use your store name."
                   onInput={(e: Event) => setEmail({ senderName: val(e) })} />
@@ -264,17 +283,26 @@ export default function Editor() {
                 </s-text>
               </Group>
             )}
+            <s-stack direction="inline" gap="small-200" alignItems="center">
+              <s-button variant="tertiary" tone="critical" onClick={resetTab}>Reset this tab to defaults</s-button>
+              {dirty && <s-text color="subdued">Unsaved changes</s-text>}
+            </s-stack>
           </s-stack>
 
-          {/* Live preview of the tab being edited. */}
+          {/* Live preview of the tab being edited; it stays in view while the controls scroll. */}
+          <div style={{ position: "sticky", top: 16, alignSelf: "start" }}>
           <s-box padding="large" background="subdued" borderRadius="base">
+            <s-stack gap="base">
+              <s-text color="subdued" type="strong">Live preview</s-text>
             <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: 420 }}>
               {tab === "button" && <ButtonPreview button={values.button} />}
               {tab === "form" && <FormPreview form={values.form} button={values.button} />}
               {tab === "email" && <EmailPreview email={values.email} />}
               {tab === "settings" && <InboxPreview email={values.email} />}
             </div>
+            </s-stack>
           </s-box>
+          </div>
         </s-grid>
       </s-stack>
     </s-page>

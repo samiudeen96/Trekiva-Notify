@@ -8,6 +8,7 @@ import { authenticate } from "../shopify.server";
 import { loadSettings, saveGeneral } from "../settings/settings.server";
 import { fieldErrors, generalSchema, type GeneralValues } from "../settings/schema";
 import { sendTestEmail } from "../email/test-email.server";
+import { SettingsRow } from "../components/ui";
 import { env } from "../utils/env.server";
 
 const LOCATIONS_QUERY = `#graphql
@@ -127,60 +128,63 @@ export default function Settings() {
         Save
       </s-button>
 
-      <s-section heading="Sender">
-        <s-stack gap="base">
-          {!loaded.resendReady && (
-            <s-banner tone="warning" heading="Resend is not configured">
-              Set RESEND_API_KEY and EMAIL_FROM on the server. Restock emails stay queued until then.
-            </s-banner>
-          )}
-          <s-paragraph>
-            From name and email used on restock notifications. The sending domain is verified once in Resend
-            {loaded.defaultFrom ? ` (currently ${loaded.defaultFrom}).` : "."} A from email here must be on that same domain.
-          </s-paragraph>
-          <s-email-field label="From email (optional)" value={values.senderEmail} error={errors.senderEmail}
-            placeholder="notify@yourdomain.com" onInput={(e: Event) => set({ senderEmail: val(e) })} />
-          <s-email-field label="Reply-to email (optional)" value={values.replyTo} error={errors.replyTo}
+      {!loaded.resendReady && (
+        <s-banner tone="warning" heading="Email sending is not set up">
+          Set RESEND_API_KEY and EMAIL_FROM on the server. Restock emails stay queued until then.
+        </s-banner>
+      )}
+
+      <s-section>
+        <SettingsRow
+          title="Sender"
+          description={`From name and email used on restock notifications. The sending domain is verified once in Resend${loaded.defaultFrom ? ` (currently ${loaded.defaultFrom})` : ""}; a from email here must be on that same domain.`}
+        >
+          <s-email-field autocomplete="off" name="notify-from-address" label="From email (optional)" value={values.senderEmail}
+            error={errors.senderEmail} placeholder="notify@yourdomain.com"
+            onInput={(e: Event) => set({ senderEmail: val(e) })} />
+          <s-email-field autocomplete="off" name="notify-reply-to-address" label="Reply-to email (optional)" value={values.replyTo}
+            error={errors.replyTo} details="Where customer replies go."
             onInput={(e: Event) => set({ replyTo: val(e) })} />
-          <s-stack direction="inline" gap="small-200" alignItems="end">
-            <s-email-field label="Send a test email to" value={testTo} onInput={(e: Event) => setTestTo(val(e))} />
+          <s-grid gridTemplateColumns="1fr auto" gap="small-200" alignItems="end">
+            <s-email-field autocomplete="off" name="notify-test-recipient" label="Send a test email to" value={testTo}
+              onInput={(e: Event) => setTestTo(val(e))} />
             <s-button onClick={sendTest} {...(testFetcher.state !== "idle" ? { loading: true } : {})} {...(testTo ? {} : { disabled: true })}>
               Send test
             </s-button>
-          </s-stack>
+          </s-grid>
           <s-text color="subdued">The test uses your saved email design. Save changes in the editor first.</s-text>
-        </s-stack>
-      </s-section>
+        </SettingsRow>
+        <s-divider />
 
-      <s-section heading="Storefront">
-        <s-stack gap="base">
-          <s-paragraph>Control the Notify me button on your store.</s-paragraph>
-          <s-switch label="Back in stock alert" checked={values.enabled} onChange={(e: Event) => set({ enabled: checked(e) })} />
-          <s-switch label="Hide Add to cart and Buy it now when a variant is sold out"
+        <SettingsRow title="Storefront" description="Control the Notify me button on your store.">
+          <s-switch label="Back in stock alert" details="Show the Notify me button and send restock emails."
+            checked={values.enabled} onChange={(e: Event) => set({ enabled: checked(e) })} />
+          <s-switch label="Replace Add to cart and Buy it now when sold out"
+            details="Hides the purchase buttons for a sold-out variant so only Notify me shows."
             checked={values.hidePurchaseButtons} onChange={(e: Event) => set({ hidePurchaseButtons: checked(e) })} />
-        </s-stack>
-      </s-section>
+        </SettingsRow>
+        <s-divider />
 
-      <s-section heading="Location-based alerts">
-        <s-stack gap="small-200">
-          <s-paragraph>Send back in stock email when items restock at selected locations. With none selected, every location counts.</s-paragraph>
+        <SettingsRow title="Location-based alerts"
+          description="Send back in stock email when items restock at selected locations. With none selected, every location counts.">
+          {loaded.locations.length === 0 && <s-text color="subdued">No locations found.</s-text>}
           {loaded.locations.map((l) => (
             <s-checkbox key={l.id} label={l.name} checked={values.enabledLocationIds.includes(l.id)}
               onChange={(e: Event) => toggleLocation(l.id, checked(e))} />
           ))}
           {errors.enabledLocationIds && <s-text color="subdued">{errors.enabledLocationIds}</s-text>}
-        </s-stack>
-      </s-section>
+        </SettingsRow>
+        <s-divider />
 
-      <s-section heading="Email delivery settings">
-        <s-number-field label="Customers will be notified when stock is equal to or greater than this number"
-          min={1} value={String(values.minStockThreshold)} error={errors.minStockThreshold}
-          onInput={(e: Event) => set({ minStockThreshold: Math.max(1, Math.round(Number(val(e)) || 1)) })} />
-      </s-section>
+        <SettingsRow title="Email delivery" description="Set the logic that controls when emails go out.">
+          <s-number-field label="Notify when stock is equal to or greater than" min={1} value={String(values.minStockThreshold)}
+            error={errors.minStockThreshold} details="Customers are emailed once available stock reaches this number."
+            onInput={(e: Event) => set({ minStockThreshold: Math.max(1, Math.round(Number(val(e)) || 1)) })} />
+        </SettingsRow>
+        <s-divider />
 
-      <s-section heading="Notify me request alerts">
-        <s-stack gap="base">
-          <s-paragraph>Get a summary of new Notify me requests, so you can track demand and restock at the right time. A report is sent only when requests exist.</s-paragraph>
+        <SettingsRow title="Notify me request alerts"
+          description="Get a summary of new requests so you can track demand and restock at the right time. Sent only when there are new requests: daily at 4 AM, weekly on Tuesday 10 AM, monthly on the first Tuesday 10 AM (store time).">
           <s-choice-list label="Send summary requests in" name="frequency" values={[values.reportFrequency || "NONE"]}
             onChange={(e: Event) => {
               const next = (e.currentTarget as HTMLElement & { values?: string[] }).values?.[0] ?? "NONE";
@@ -191,12 +195,12 @@ export default function Settings() {
             <s-choice value="WEEKLY">Weekly report</s-choice>
             <s-choice value="MONTHLY">Monthly report</s-choice>
           </s-choice-list>
-          <s-email-field label="Send to email" value={values.reportEmail} error={errors.reportEmail}
-            onInput={(e: Event) => set({ reportEmail: val(e) })} />
-          <s-text-field label="CC to emails" details="Separate addresses with commas." value={cc}
-            error={Object.entries(errors).find(([k]) => k.startsWith("reportCc"))?.[1]}
+          <s-email-field autocomplete="off" name="notify-report-recipient" label="Send to email" value={values.reportEmail}
+            error={errors.reportEmail} onInput={(e: Event) => set({ reportEmail: val(e) })} />
+          <s-text-field autocomplete="off" name="notify-report-cc" label="CC to emails" details="Separate addresses with commas."
+            value={cc} error={Object.entries(errors).find(([k]) => k.startsWith("reportCc"))?.[1]}
             onInput={(e: Event) => { setCc(val(e)); set({ reportCc: list(val(e)) }); }} />
-        </s-stack>
+        </SettingsRow>
       </s-section>
     </s-page>
   );

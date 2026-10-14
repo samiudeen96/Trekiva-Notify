@@ -27,9 +27,17 @@ export const VARIANT_DETAILS_QUERY = `#graphql
       id
       title
       price
+      compareAtPrice
+      selectedOptions { name value }
       image { url }
       product { title handle featuredMedia { preview { image { url } } } }
     }
+  }
+`;
+
+export const BRAND_QUERY = `#graphql
+  query NotifyBrand {
+    shop { brand { logo { image { url } } } }
   }
 `;
 
@@ -37,6 +45,7 @@ interface ShopInfo {
   name: string;
   currencyCode: string;
   storeUrl: string;
+  logoUrl: string | null;
 }
 
 interface VariantDetails {
@@ -45,6 +54,8 @@ interface VariantDetails {
   handle: string;
   imageUrl: string | null;
   price: string | null;
+  compareAtPrice: string | null;
+  options: { name: string; value: string }[];
 }
 
 async function gql<T>(admin: AdminGraphqlClient, query: string, variables?: Record<string, unknown>): Promise<T> {
@@ -56,7 +67,16 @@ async function gql<T>(admin: AdminGraphqlClient, query: string, variables?: Reco
 
 async function loadShop(admin: AdminGraphqlClient, shopDomain: string): Promise<ShopInfo> {
   const d = await gql<{ shop: { name: string; currencyCode: string; primaryDomain: { url: string } | null } }>(admin, SHOP_QUERY);
+  // Branding is optional: a store without a logo, or a lookup failure, just sends the name instead.
+  let logoUrl: string | null = null;
+  try {
+    const b = await gql<{ shop: { brand: { logo: { image: { url: string } | null } | null } | null } }>(admin, BRAND_QUERY);
+    logoUrl = b.shop.brand?.logo?.image?.url ?? null;
+  } catch {
+    logoUrl = null;
+  }
   return {
+    logoUrl,
     name: d.shop.name,
     currencyCode: d.shop.currencyCode,
     // Customers shop on the primary domain; the myshopify address is the fallback.
@@ -69,24 +89,32 @@ async function loadVariant(admin: AdminGraphqlClient, variantGid: string, shop: 
     productVariant: {
       title: string;
       price: string;
+      compareAtPrice: string | null;
+      selectedOptions: { name: string; value: string }[];
       image: { url: string } | null;
       product: { title: string; handle: string; featuredMedia: { preview: { image: { url: string } | null } | null } | null };
     } | null;
   }>(admin, VARIANT_DETAILS_QUERY, { id: variantGid });
   const v = d.productVariant;
   if (!v) return null;
-  let price: string | null = null;
-  try {
-    price = new Intl.NumberFormat("en", { style: "currency", currency: shop.currencyCode }).format(Number(v.price));
-  } catch {
-    price = null;
-  }
+  const money = (amount: string | null): string | null => {
+    if (!amount) return null;
+    try {
+      return new Intl.NumberFormat("en", { style: "currency", currency: shop.currencyCode }).format(Number(amount));
+    } catch {
+      return null;
+    }
+  };
+  const price = money(v.price);
+  const compareAt = Number(v.compareAtPrice) > Number(v.price) ? money(v.compareAtPrice) : null;
   return {
     title: v.title,
     productTitle: v.product.title,
     handle: v.product.handle,
     imageUrl: v.image?.url ?? v.product.featuredMedia?.preview?.image?.url ?? null,
     price,
+    compareAtPrice: compareAt,
+    options: v.selectedOptions,
   };
 }
 
@@ -196,8 +224,12 @@ export async function processJobs(limit = 200): Promise<{ sent: number; failed: 
           shopName: shop.name,
           productName: variant.productTitle,
           variantTitle: variant.title,
+          options: variant.options,
           imageUrl: variant.imageUrl,
           price: variant.price,
+          compareAtPrice: variant.compareAtPrice,
+          shopLogoUrl: shop.logoUrl,
+          storeUrl: shop.storeUrl,
           productUrl,
           unsubscribeUrl,
         });

@@ -34,6 +34,8 @@ export const emailSchema = z.object({
   body: text(1000),
   buttonLabel: text(40).min(1, "Button label is required"),
   footer: text(300),
+  logoUrl: z.union([z.literal(""), z.string().trim().max(500).regex(/^https:\/\//i, "Use a full https:// image link")]),
+  accentColor: color,
 });
 
 export const SHOW_ON = ["product", "collection", "search", "home"] as const;
