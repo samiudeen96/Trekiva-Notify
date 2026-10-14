@@ -1,0 +1,6 @@
+api_version = "2026-10"
+
+[[extensions]]
+name = "Trekiva Notify"
+handle = "trekiva-notify"
+type = "theme"

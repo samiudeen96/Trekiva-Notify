@@ -1,0 +1,61 @@
+# This file stores configurations for your Shopify app.
+# Link it to the app you create in the Partner Dashboard: `npm run config:link`
+name = "Trekiva Notify"
+client_id = "REPLACE_WITH_CLIENT_ID"
+application_url = "https://notify.example.com"
+embedded = true
+
+[access_scopes]
+# read_orders: revenue-converted attribution. read_locations: location-based alerts.
+scopes = "read_products,read_inventory,read_locations,read_orders"
+
+[webhooks]
+api_version = "2026-10"
+
+  # Handled by: /app/routes/webhooks.app.uninstalled.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = ["app/uninstalled"]
+
+  # Handled by: /app/routes/webhooks.app.scopes_update.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/scopes_update"
+  topics = ["app/scopes_update"]
+
+  # A stock increase may send the restock emails. Handled by: /app/routes/webhooks.inventory_levels.update.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/inventory_levels/update"
+  topics = ["inventory_levels/update"]
+
+  # Handled by: /app/routes/webhooks.products.delete.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/products/delete"
+  topics = ["products/delete"]
+
+  # Revenue converted. Handled by: /app/routes/webhooks.orders.paid.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/paid"
+  topics = ["orders/paid"]
+
+  # Mandatory compliance topics. Handled by /app/routes/webhooks.customers.* and webhooks.shop.redact.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
+  compliance_topics = ["customers/data_request"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/redact"
+  compliance_topics = ["customers/redact"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop/redact"
+  compliance_topics = ["shop/redact"]
+
+[auth]
+redirect_urls = ["https://notify.example.com/auth/callback"]
+
+# Storefront requests go through the app proxy (signed by Shopify, same-origin, no CORS).
+# https://<shop>/apps/notify/*  ->  <app url>/api/public/*
+[app_proxy]
+url = "https://notify.example.com/api/public"
+subpath = "notify"
+prefix = "apps"

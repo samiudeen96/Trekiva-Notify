@@ -1,0 +1,14 @@
+{%- comment -%}
+  Optional: place the Notify me button exactly where you want it on the product page. Without this
+  block the app embed puts the button under the Add to cart buttons.
+{%- endcomment -%}
+<div class="trekiva-notify-anchor" data-trekiva-notify-anchor {{ block.shopify_attributes }}></div>
+
+{% schema %}
+{
+  "name": "Notify me button",
+  "target": "section",
+  "enabled_on": { "templates": ["product"] },
+  "settings": []
+}
+{% endschema %}

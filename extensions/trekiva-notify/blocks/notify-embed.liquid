@@ -1,0 +1,56 @@
+{%- comment -%}
+  Trekiva Notify app embed. Enable it in Online Store > Themes > Customize > App embeds.
+  It covers every page that shows products (product, collection, search, home). All settings come
+  from the app proxy; nothing secret is rendered here.
+
+  Nothing here may block the page: the stylesheet URL is only passed along and the deferred script
+  loads it once the page has finished loading (a <link rel="stylesheet"> in the body would hold back
+  every script after it).
+{%- endcomment -%}
+<div
+  id="trekiva-notify-root"
+  data-proxy-base="/apps/notify"
+  data-css="{{ 'trekiva-notify.css' | asset_url }}"
+  data-page-type="{{ request.page_type | escape }}"
+  data-design-mode="{{ request.design_mode }}"
+  data-hide-selectors="{{ block.settings.hide_selectors | escape }}"
+  data-card-selector="{{ block.settings.card_selector | escape }}"
+  hidden
+></div>
+{%- if request.page_type == 'product' and product -%}
+  <script type="application/json" id="trekiva-notify-product">
+    {
+      "id": {{ product.id }},
+      "handle": {{ product.handle | json }},
+      "tags": {{ product.tags | json }},
+      "collections": [{% for c in product.collections %}{{ c.id }}{% unless forloop.last %},{% endunless %}{% endfor %}],
+      "variants": [
+        {%- for v in product.variants -%}
+          { "id": {{ v.id }}, "title": {{ v.title | json }}, "available": {{ v.available | json }} }{% unless forloop.last %},{% endunless %}
+        {%- endfor -%}
+      ]
+    }
+  </script>
+{%- endif -%}
+<script src="{{ 'trekiva-notify.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Trekiva Notify",
+  "target": "body",
+  "settings": [
+    {
+      "type": "text",
+      "id": "hide_selectors",
+      "label": "Extra selectors to hide when sold out",
+      "info": "Comma-separated CSS selectors for Add to cart / Buy it now buttons your theme shows on sold-out variants."
+    },
+    {
+      "type": "text",
+      "id": "card_selector",
+      "label": "Product card selector",
+      "info": "Only if the Notify me button is missing on collection or search cards. Example: .my-product-card"
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+
+  @@index([shop])
+}
+
+enum SubscriptionStatus {
+  PENDING
+  NOTIFIED
+  UNSUBSCRIBED
+  FAILED
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  SENT
+  FAILED
+}
+
+// One row per (shop, variant, email). A NOTIFIED row is reset to PENDING if the customer
+// subscribes again after the variant sells out once more.
+model Subscription {
+  id              String             @id @default(cuid())
+  shopDomain      String
+  productId       String
+  variantId       String
+  inventoryItemId String?
+  email           String
+  emailNormalized String
+  status          SubscriptionStatus @default(PENDING)
+  pageType        String?
+  marketingOptIn  Boolean            @default(false)
+  unsubToken      String             @unique @default(cuid())
+  revenue         Decimal?           @db.Decimal(12, 2)
+  createdAt       DateTime           @default(now())
+  notifiedAt      DateTime?
+
+  jobs NotificationJob[]
+  logs NotificationLog[]
+
+  @@unique([shopDomain, variantId, emailNormalized])
+  @@index([shopDomain, variantId, status])
+  @@index([shopDomain, inventoryItemId, status])
+  @@index([shopDomain, status, createdAt])
+}
+
+// Outbox for restock emails: the webhook only inserts rows, the cron worker sends them.
+model NotificationJob {
+  id             String      @id @default(cuid())
+  shopDomain     String
+  subscriptionId String
+  status         JobStatus   @default(QUEUED)
+  attempts       Int         @default(0)
+  runAfter       DateTime    @default(now())
+  lastError      String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([status, runAfter])
+  @@index([shopDomain])
+}
+
+model NotificationLog {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  resendId       String?  @unique
+  status         String   // SENT | DELIVERED | BOUNCED | COMPLAINED | FAILED
+  error          String?
+  createdAt      DateTime @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+}
+
+model Settings {
+  shopDomain         String   @id
+  enabled            Boolean  @default(true)
+  hidePurchaseButtons Boolean @default(true)
+  showOn             String[] @default(["product"])
+  productRule        Json     @default("{\"mode\":\"ALL\"}")
+  buttonConfig       Json     @default("{}")
+  formConfig         Json     @default("{}")
+  emailConfig        Json     @default("{}")
+  senderEmail        String?
+  replyTo            String?
+  enabledLocationIds String[] @default([])
+  minStockThreshold  Int      @default(1)
+  reportFrequency    String?  // DAILY | WEEKLY | MONTHLY
+  reportEmail        String?
+  reportCc           String[] @default([])
+  embedActivated     Boolean  @default(false)
+  setupConfirmed     Boolean  @default(false)
+  lastReportAt       DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
