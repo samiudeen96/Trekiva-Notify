@@ -109,7 +109,7 @@ export default function Editor() {
     setValues((v) => {
       if (tab === "button") return { ...v, button: { ...DEFAULT_BUTTON }, showOn: ["product"], productRule: { mode: "ALL", ids: [], tags: [] } };
       if (tab === "form") return { ...v, form: { ...DEFAULT_FORM } };
-      if (tab === "email") return { ...v, email: { ...v.email, heading: DEFAULT_EMAIL.heading, body: DEFAULT_EMAIL.body, buttonLabel: DEFAULT_EMAIL.buttonLabel, footer: DEFAULT_EMAIL.footer, logoUrl: DEFAULT_EMAIL.logoUrl, accentColor: DEFAULT_EMAIL.accentColor } };
+      if (tab === "email") return { ...v, email: { ...v.email, heading: DEFAULT_EMAIL.heading, body: DEFAULT_EMAIL.body, buttonLabel: DEFAULT_EMAIL.buttonLabel, footer: DEFAULT_EMAIL.footer, logoUrl: DEFAULT_EMAIL.logoUrl, logoHeight: DEFAULT_EMAIL.logoHeight, accentColor: DEFAULT_EMAIL.accentColor } };
       return { ...v, email: { ...v.email, senderName: DEFAULT_EMAIL.senderName, subject: DEFAULT_EMAIL.subject, previewText: DEFAULT_EMAIL.previewText } };
     });
 
@@ -258,6 +258,9 @@ export default function Editor() {
                   placeholder="https://…/logo.png"
                   details="A full https:// image link, about 400 px wide. Leave empty to use your store's logo from Shopify branding."
                   onInput={(e: Event) => setEmail({ logoUrl: val(e) })} />
+                <s-number-field label="Logo height (px)" min={16} max={120} value={String(values.email.logoHeight)}
+                  error={errors["email.logoHeight"]} details="Between 16 and 120. The width follows your image."
+                  onInput={(e: Event) => setEmail({ logoHeight: Math.round(Number(val(e)) || 40) })} />
                 <s-color-field label="Button color" value={values.email.accentColor} error={errors["email.accentColor"]}
                   onInput={(e: Event) => setEmail({ accentColor: val(e) })} />
                 <s-text-field label="Heading" value={values.email.heading} onInput={(e: Event) => setEmail({ heading: val(e) })} />

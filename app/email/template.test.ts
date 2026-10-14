@@ -88,6 +88,28 @@ describe("product and brand", () => {
   });
 });
 
+describe("header", () => {
+  it("centres the brand, whether it is a logo or the shop name", () => {
+    const withLogo = renderRestockEmail({ logoUrl: "https://cdn.example.com/l.png" }, vars).html;
+    expect(withLogo).toContain('align="center" style="padding:24px 28px 18px');
+    expect(withLogo).toContain("margin:0 auto");
+    expect(renderRestockEmail({}, vars).html).toContain("text-align:center;\">");
+  });
+});
+
+describe("logo size", () => {
+  const logo = "https://cdn.example.com/l.png";
+  it("uses the merchant's height, 40px by default", () => {
+    expect(renderRestockEmail({ logoUrl: logo }, vars).html).toContain("height:40px");
+    expect(renderRestockEmail({ logoUrl: logo, logoHeight: 72 }, vars).html).toContain('height="72"');
+  });
+  it("clamps absurd values and ignores wrong types", () => {
+    expect(renderRestockEmail({ logoUrl: logo, logoHeight: 5000 }, vars).html).toContain("height:120px");
+    expect(renderRestockEmail({ logoUrl: logo, logoHeight: 2 }, vars).html).toContain("height:16px");
+    expect(renderRestockEmail({ logoUrl: logo, logoHeight: "big" }, vars).html).toContain("height:40px");
+  });
+});
+
 describe("footer", () => {
   it("links back to the store in both parts when the store url is known", () => {
     const r = renderRestockEmail({}, { ...vars, storeUrl: "https://trekiva.com" });

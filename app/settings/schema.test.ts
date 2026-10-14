@@ -22,6 +22,12 @@ describe("editorSchema", () => {
     expect(editorSchema.safeParse({ ...editor, productRule: { mode: "TAGS", tags: ["sale"] } }).success).toBe(true);
   });
 
+  it("keeps the logo height in range", () => {
+    expect(editorSchema.safeParse({ ...editor, email: { ...DEFAULT_EMAIL, logoHeight: 80 } }).success).toBe(true);
+    expect(editorSchema.safeParse({ ...editor, email: { ...DEFAULT_EMAIL, logoHeight: 5 } }).success).toBe(false);
+    expect(editorSchema.safeParse({ ...editor, email: { ...DEFAULT_EMAIL, logoHeight: 500 } }).success).toBe(false);
+  });
+
   it("rejects unknown pages", () => {
     expect(editorSchema.safeParse({ ...editor, showOn: ["cart"] }).success).toBe(false);
   });

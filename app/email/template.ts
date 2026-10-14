@@ -75,8 +75,10 @@ export function renderRestockEmail(stored: unknown, v: RestockEmailVars): Render
   const logo = c.logoUrl || v.shopLogoUrl || "";
   const preview = plain(c.previewText);
 
+  // The height is the merchant's choice (16-120 px); the width follows the image and never exceeds the card.
+  const logoHeight = Math.min(120, Math.max(16, Math.round(Number(c.logoHeight)) || 40));
   const header = logo
-    ? `<img src="${escapeHtml(safeUrl(logo))}" alt="${escapeHtml(v.shopName)}" height="40" style="display:block;height:40px;width:auto;max-width:200px;">`
+    ? `<img src="${escapeHtml(safeUrl(logo))}" alt="${escapeHtml(v.shopName)}" height="${logoHeight}" style="display:block;margin:0 auto;height:${logoHeight}px;width:auto;max-width:100%;">`
     : `<span style="font-size:18px;font-weight:700;color:#111;">${escapeHtml(v.shopName)}</span>`;
 
   const optionRows = options.length
@@ -114,7 +116,7 @@ export function renderRestockEmail(stored: unknown, v: RestockEmailVars): Render
 <span style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preview)}</span>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f6f7;padding:24px 12px;"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;background:#ffffff;border-radius:14px">
-<tr><td class="tn-pad" style="padding:24px 28px 18px;border-bottom:1px solid #f0f0f0;">${header}</td></tr>
+<tr><td class="tn-pad" align="center" style="padding:24px 28px 18px;border-bottom:1px solid #f0f0f0;text-align:center;">${header}</td></tr>
 <tr><td class="tn-pad" style="padding:26px 28px 0;font-size:24px;font-weight:700;line-height:1.25;">${html(c.heading)}</td></tr>
 <tr><td class="tn-pad" style="padding:10px 28px 0;font-size:15px;line-height:1.55;color:#303030;">${html(c.body)}</td></tr>
 <tr><td class="tn-pad" style="padding:20px 28px 0;">${productBlock}</td></tr>

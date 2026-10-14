@@ -85,6 +85,8 @@ export interface EmailConfig {
   footer: string;
   /** Logo shown at the top. Empty = the store's logo from Shopify branding, then the store name. */
   logoUrl: string;
+  /** Logo height in pixels; the width follows the image's proportions. */
+  logoHeight: number;
   /** Button colour in the email. */
   accentColor: string;
 }
@@ -98,5 +100,6 @@ export const DEFAULT_EMAIL: EmailConfig = {
   buttonLabel: "Buy now",
   footer: "",
   logoUrl: "",
+  logoHeight: 40,
   accentColor: "#111111",
 };
