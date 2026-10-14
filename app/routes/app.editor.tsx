@@ -178,12 +178,15 @@ export default function Editor() {
                   <s-grid gridTemplateColumns="1fr 1fr" gap="small-200">
                     {SHOW_ON.map((p) => (
                       <s-checkbox key={p} label={PAGE_LABELS[p]} checked={values.showOn.includes(p)}
-                        onChange={(e: Event) =>
+                        onChange={(e: Event) => {
+                          // Read the checkbox now: a browser event's currentTarget is null by the time
+                          // React runs the state updater below.
+                          const on = checked(e);
                           setValues((v) => ({
                             ...v,
-                            showOn: checked(e) ? [...v.showOn.filter((x) => x !== p), p] : v.showOn.filter((x) => x !== p),
-                          }))
-                        } />
+                            showOn: on ? [...v.showOn.filter((x) => x !== p), p] : v.showOn.filter((x) => x !== p),
+                          }));
+                        }} />
                     ))}
                   </s-grid>
                 </Group>
