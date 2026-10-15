@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderReportEmail } from "./template";
 
 describe("renderReportEmail", () => {
-  const base = { shopName: "Trekiva", frequency: "WEEKLY" as const, adminUrl: "https://admin.example.com/x" };
+  const base = { shopName: "Trekiva", frequency: "WEEKLY" as const };
 
   it("summarises the requests and pluralises", () => {
     const r = renderReportEmail({ ...base, total: 3, rows: [{ item: "Sandal - Tan / 6", count: 2 }, { item: "Boot", count: 1 }] });
@@ -31,7 +31,10 @@ describe("renderReportEmail", () => {
     expect(both.text).toContain("PDF");
   });
 
-  it("blocks a non-http link", () => {
-    expect(renderReportEmail({ ...base, adminUrl: "javascript:alert(1)", total: 1, rows: [] }).html).not.toContain("javascript:");
+  it("has no link to the admin: the report is the email and its attachment", () => {
+    const r = renderReportEmail({ ...base, total: 1, rows: [] });
+    expect(r.html).not.toContain("View all subscribers");
+    expect(r.html).not.toContain("<a ");
+    expect(r.text).not.toContain("View all subscribers");
   });
 });

@@ -17,7 +17,6 @@ export async function sendSampleReport(opts: {
   /** EXCEL | PDF | BOTH: the same choice the real reports use. */
   format: string;
   timeZone: string;
-  adminUrl: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const resend = getResend();
   if (!resend || !env.EMAIL_FROM) return { ok: false, error: "Resend is not configured (RESEND_API_KEY and EMAIL_FROM)." };
@@ -70,7 +69,6 @@ export async function sendSampleReport(opts: {
       { item: "Men's Slip-On Sandals - Tan / 7", count: 3 },
       { item: "Trail Runner - Black / 9", count: 2 },
     ],
-    adminUrl: opts.adminUrl,
   });
   const { error } = await resend.emails.send({
     from: buildFrom(env.EMAIL_FROM, `${opts.shopName} Notify me`, opts.senderEmail),

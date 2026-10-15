@@ -85,7 +85,6 @@ export async function runReports(now = new Date()): Promise<{ sent: number; skip
           frequency,
           total,
           rows: top.map((g) => ({ item: labels[g.variantId] ?? `Variant ${g.variantId.split("/").pop()}`, count: g._count._all })),
-          adminUrl: `https://${s.shopDomain}/admin/apps`,
         });
         const { error } = await resend.emails.send({
           from: buildFrom(env.EMAIL_FROM, `${shop.name} Notify me`, s.senderEmail),

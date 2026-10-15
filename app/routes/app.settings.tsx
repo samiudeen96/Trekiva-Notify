@@ -88,7 +88,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       senderEmail: settings.senderEmail,
       format: settings.reportFormat,
       timeZone,
-      adminUrl: `https://${session.shop}/admin/apps`,
     });
     return {
       kind: "test" as const,

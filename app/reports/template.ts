@@ -10,7 +10,6 @@ export interface ReportInput {
   frequency: "DAILY" | "WEEKLY" | "MONTHLY";
   total: number;
   rows: ReportRow[]; // most requested first
-  adminUrl: string;
   /** The files attached to the email, so the email can point to them. */
   attachments?: { name: string; kind: "Excel" | "PDF" }[];
 }
@@ -42,7 +41,6 @@ export function renderReportEmail(r: ReportInput): { subject: string; html: stri
         `<td style="padding:8px 0;border-top:1px solid #eee;text-align:right;font-weight:600;">${row.count}</td></tr>`,
     )
     .join("");
-  const safeLink = /^https?:\/\//i.test(r.adminUrl) ? r.adminUrl : "#";
 
   const html = `<!doctype html>
 <html><body style="margin:0;padding:24px 12px;background:#f6f6f7;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#111;">
@@ -55,16 +53,13 @@ export function renderReportEmail(r: ReportInput): { subject: string; html: stri
 ${body}
 </table>
 ${attachmentHtml}
-<p style="margin:20px 0 0;"><a href="${escapeHtml(safeLink)}" style="color:#111;font-weight:600;">View all subscribers</a></p>
 </td></tr></table></body></html>`;
 
   const text = [
     `${r.total} new Notify me ${noun} (${period} report)`,
     "",
     ...r.rows.map((row) => `${row.count} x ${row.item}`),
-    "",
-    ...(attachmentText ? [attachmentText, ""] : []),
-    `View all subscribers: ${r.adminUrl}`,
+    ...(attachmentText ? ["", attachmentText] : []),
   ].join("\n");
 
   return { subject, html, text };
