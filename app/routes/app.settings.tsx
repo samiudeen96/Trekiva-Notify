@@ -9,6 +9,7 @@ import { loadSettings, saveGeneral } from "../settings/settings.server";
 import { fieldErrors, generalSchema, type GeneralValues } from "../settings/schema";
 import { sendTestEmail } from "../email/test-email.server";
 import { SettingsRow } from "../components/ui";
+import { addEmails } from "../subscriptions/email";
 import { env } from "../utils/env.server";
 
 const LOCATIONS_QUERY = `#graphql
@@ -85,7 +86,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 const val = (e: Event) => (e.currentTarget as HTMLInputElement).value;
 const checked = (e: Event) => (e.currentTarget as HTMLInputElement).checked;
-const list = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
+const MAX_CC = 10;
 
 export default function Settings() {
   const loaded = useLoaderData<typeof loader>();
@@ -94,7 +95,8 @@ export default function Settings() {
   const testFetcher = useFetcher<typeof action>();
 
   const [values, setValues] = useState<GeneralValues>(loaded.values);
-  const [cc, setCc] = useState(loaded.values.reportCc.join(", "));
+  const [ccInput, setCcInput] = useState("");
+  const [ccError, setCcError] = useState<string | null>(null);
   const [testTo, setTestTo] = useState("");
   const [initial] = useState(() => JSON.stringify(loaded.values));
   const [submitted, setSubmitted] = useState(initial);
@@ -110,6 +112,25 @@ export default function Settings() {
   useEffect(() => {
     if (testFetcher.data?.message) void shopify.toast.show(testFetcher.data.message, { isError: !testFetcher.data.ok });
   }, [testFetcher.data, shopify]);
+
+  // Adds whatever is typed in the CC box (one address or a pasted list) as chips.
+  const addCc = () => {
+    if (!ccInput.trim()) return;
+    const r = addEmails(values.reportCc, ccInput, MAX_CC);
+    set({ reportCc: r.list });
+    if (r.invalid.length) {
+      // Keep the bad ones in the box so they can be fixed instead of retyped.
+      setCcInput(r.invalid.join(", "));
+      setCcError(`Not a valid email: ${r.invalid.join(", ")}`);
+    } else if (r.overflow.length) {
+      setCcInput("");
+      setCcError(`You can add up to ${MAX_CC} CC addresses.`);
+    } else {
+      setCcInput("");
+      setCcError(null);
+    }
+  };
+  const removeCc = (email: string) => set({ reportCc: values.reportCc.filter((x) => x !== email) });
 
   const save = () => {
     setSubmitted(JSON.stringify(values));
@@ -197,9 +218,31 @@ export default function Settings() {
           </s-choice-list>
           <s-email-field autocomplete="off" name="notify-report-recipient" label="Send to email" value={values.reportEmail}
             error={errors.reportEmail} onInput={(e: Event) => set({ reportEmail: val(e) })} />
-          <s-text-field autocomplete="off" name="notify-report-cc" label="CC to emails" details="Separate addresses with commas."
-            value={cc} error={Object.entries(errors).find(([k]) => k.startsWith("reportCc"))?.[1]}
-            onInput={(e: Event) => { setCc(val(e)); set({ reportCc: list(val(e)) }); }} />
+          <s-stack gap="small-200">
+            {/* Enter in the box adds the address; keydown bubbles out of the field to this wrapper. */}
+            <div role="presentation" onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); addCc(); } }}>
+            <s-grid gridTemplateColumns="1fr auto" gap="small-200" alignItems="end">
+              <s-text-field autocomplete="off" name="notify-report-cc" label="CC to emails" placeholder="name@example.com"
+                value={ccInput} error={ccError ?? Object.entries(errors).find(([k]) => k.startsWith("reportCc"))?.[1]}
+                onInput={(e: Event) => { setCcInput(val(e)); setCcError(null); }} />
+              <s-button onClick={addCc} {...(ccInput.trim() ? {} : { disabled: true })}>Add</s-button>
+            </s-grid>
+            </div>
+            <s-text color="subdued">Press Enter or Add. You can paste several, separated by commas. Up to {MAX_CC}.</s-text>
+            {values.reportCc.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {values.reportCc.map((email) => (
+                  <span key={email} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#f1f1f1", borderRadius: 8, padding: "4px 6px 4px 10px", fontSize: 13 }}>
+                    {email}
+                    <button type="button" aria-label={`Remove ${email}`} onClick={() => removeCc(email)}
+                      style={{ border: 0, background: "transparent", cursor: "pointer", fontSize: 16, lineHeight: 1, color: "#6d7175", padding: "0 4px" }}>
+                      &times;
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </s-stack>
         </SettingsRow>
       </s-section>
     </s-page>
