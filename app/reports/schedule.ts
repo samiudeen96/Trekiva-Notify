@@ -30,6 +30,14 @@ export function zonedInstant({ y, m, d }: LocalDate, hour: number, timeZone: str
   return new Date(guess - offsetMs(new Date(first), timeZone));
 }
 
+/**
+ * A date whose UTC clock reads the shop's local time. Excel dates carry no time zone, so a request made
+ * at 10:30 in Kolkata has to be written as 10:30 for a person opening the file to see 10:30.
+ */
+export function shiftToZone(at: Date, timeZone: string): Date {
+  return new Date(at.getTime() + offsetMs(at, timeZone));
+}
+
 function localDate(at: Date, timeZone: string): LocalDate {
   const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" })
     .format(at)

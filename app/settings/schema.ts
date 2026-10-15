@@ -75,6 +75,7 @@ export const generalSchema = z.object({
   reportHour: z.number().int().min(0).max(23),
   reportWeekday: z.number().int().min(0).max(6),
   reportMonthDay: z.number().int().min(1).max(28),
+  reportFormat: z.enum(["EXCEL", "PDF", "BOTH"]),
   reportEmail: optionalEmail,
   reportCc: z.array(z.string().trim().toLowerCase().max(254).email()).max(10),
 });

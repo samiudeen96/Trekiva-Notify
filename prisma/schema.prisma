@@ -123,6 +123,7 @@ model Settings {
   reportHour         Int      @default(10)   // 0-23, in the shop's time zone
   reportWeekday      Int      @default(2)    // weekly reports: 0 = Sunday ... 6 = Saturday
   reportMonthDay     Int      @default(1)    // monthly reports: 1-28
+  reportFormat       String   @default("EXCEL") // EXCEL | PDF | BOTH: what is attached to report emails
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }

@@ -14,6 +14,8 @@ ENV NODE_ENV=production
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/build ./build
 COPY --from=build --chown=node:node /app/prisma ./prisma
+# Fonts the PDF report draws with (read at runtime from ./assets/fonts).
+COPY --from=build --chown=node:node /app/assets ./assets
 COPY --from=build --chown=node:node /app/package.json ./package.json
 USER node
 EXPOSE 3000

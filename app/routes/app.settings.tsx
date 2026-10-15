@@ -8,6 +8,7 @@ import { authenticate } from "../shopify.server";
 import { loadSettings, saveGeneral } from "../settings/settings.server";
 import { fieldErrors, generalSchema, type GeneralValues } from "../settings/schema";
 import { sendTestEmail } from "../email/test-email.server";
+import { shopBasics } from "../shopify/shop.server";
 import { sendSampleReport } from "../reports/test-report.server";
 import { nextReportAt } from "../reports/schedule";
 import { SettingsRow } from "../components/ui";
@@ -48,6 +49,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     reportHour: settings.reportHour,
     reportWeekday: settings.reportWeekday,
     reportMonthDay: settings.reportMonthDay,
+    reportFormat: settings.reportFormat,
     reportEmail: settings.reportEmail,
     reportCc: settings.reportCc,
   };
@@ -72,16 +74,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const settings = await loadSettings(session.shop);
-  let shopName = session.shop;
   if (parsed.data.intent === "sampleReport" && !settings.reportEmail) {
     return { kind: "test" as const, ok: false, errors: {} as Record<string, string>, message: "Save a Send to email first." };
   }
-  try {
-    const res = await admin.graphql(`#graphql\n query NotifyShopName { shop { name } }`);
-    shopName = ((await res.json()) as { data?: { shop: { name: string } } }).data?.shop.name ?? shopName;
-  } catch {
-    /* the myshopify domain is a fine fallback name */
-  }
+  // The name (and zone) are only for the email text; the domain and UTC are fine fallbacks.
+  const { name: shopName, timeZone } = await shopBasics(admin, session.shop);
   if (parsed.data.intent === "sampleReport") {
     const sample = await sendSampleReport({
       to: settings.reportEmail,
@@ -89,6 +86,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       shopName,
       frequency: settings.reportFrequency || "WEEKLY",
       senderEmail: settings.senderEmail,
+      format: settings.reportFormat,
+      timeZone,
       adminUrl: `https://${session.shop}/admin/apps`,
     });
     return {
@@ -299,6 +298,17 @@ export default function Settings() {
                 </s-text>
               </s-stack>
             </s-box>
+          )}
+          {values.reportFrequency && (
+            <s-choice-list label="File attached to the report" name="report-format" values={[values.reportFormat]}
+              onChange={(e: Event) => {
+                const next = (e.currentTarget as HTMLElement & { values?: string[] }).values?.[0] ?? "EXCEL";
+                set({ reportFormat: next as GeneralValues["reportFormat"] });
+              }}>
+              <s-choice value="EXCEL">Excel (.xlsx)<s-text slot="details" color="subdued">Every request in a spreadsheet you can filter and sort. Best for your ecommerce team.</s-text></s-choice>
+              <s-choice value="PDF">PDF<s-text slot="details" color="subdued">A clean summary plus the latest 500 requests, ready to read or print.</s-text></s-choice>
+              <s-choice value="BOTH">Excel and PDF<s-text slot="details" color="subdued">Excel for the data and a PDF for reading, in the same email.</s-text></s-choice>
+            </s-choice-list>
           )}
           <s-email-field autocomplete="off" name="notify-report-recipient" label="Send to email" value={values.reportEmail}
             error={errors.reportEmail} onInput={(e: Event) => set({ reportEmail: val(e) })} />

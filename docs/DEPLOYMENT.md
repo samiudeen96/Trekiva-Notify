@@ -67,6 +67,7 @@ Put `CRON_SECRET=...` at the top of the crontab (cron does not read `.env`).
 - Postgres publishes no ports; do not add a `ports:` entry to it.
 
 ## 9. Known limits
+- The PDF report draws with the fonts in `assets/fonts/` (Noto Sans, SIL Open Font License); the Docker image copies them in. A PDF holds the latest 500 requests; the Excel file holds up to 50,000.
 - The rate limiter is in memory, so run a single app instance.
 - Collection rules apply on product pages only; cards cannot tell which collections a product is in.
 - The "Delivered" status depends on the Resend webhook being configured.

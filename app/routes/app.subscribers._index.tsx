@@ -76,6 +76,7 @@ export default function Subscribers() {
   const busy = useNavigation().state !== "idle";
   const filtered = Boolean(q || status);
   // The request waiting for the delete confirmation popup.
+  const [exporting, setExporting] = useState<"xlsx" | "pdf" | "csv" | null>(null);
   const [target, setTarget] = useState<{ id: string; email: string; item: string; status: Status } | null>(null);
 
   // Each control keeps the others' values, so changing one filter never drops the rest.
@@ -84,22 +85,40 @@ export default function Subscribers() {
     navigate(`/app/subscribers?${new URLSearchParams({ ...(v.q ? { q: v.q } : {}), ...(v.status ? { status: v.status } : {}), page: String(p) })}`);
   };
 
-  const exportCsv = async () => {
-    const res = await fetch("/app/subscribers/export");
-    if (!res.ok) return;
-    const url = URL.createObjectURL(await res.blob());
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "trekiva-notify-subscribers.csv";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+  // Both formats respect the status filter and search that are currently applied.
+  const download = async (format: "xlsx" | "pdf" | "csv") => {
+    const params = new URLSearchParams({ format, ...(status ? { status } : {}), ...(q ? { q } : {}) });
+    setExporting(format);
+    try {
+      const res = await fetch(`/app/subscribers/export?${params}`);
+      if (!res.ok) return;
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `trekiva-notify-subscribers.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(null);
+    }
   };
 
   return (
     <s-page heading="Subscribers">
-      <s-button slot="secondary-actions" onClick={() => void exportCsv()}>Export CSV</s-button>
+      <s-button slot="primary-action" variant="primary" onClick={() => void download("xlsx")}
+        {...(exporting === "xlsx" ? { loading: true } : {})}>
+        Export Excel
+      </s-button>
+      <s-button slot="secondary-actions" onClick={() => void download("pdf")}
+        {...(exporting === "pdf" ? { loading: true } : {})}>
+        Export PDF
+      </s-button>
+      <s-button slot="secondary-actions" onClick={() => void download("csv")}
+        {...(exporting === "csv" ? { loading: true } : {})}>
+        Export CSV
+      </s-button>
       <s-section>
         <StatGrid>
           <StatTile tone="info" label="Pending" value={counts.PENDING ?? 0} hint="Waiting for stock" href="/app/subscribers?status=PENDING" />

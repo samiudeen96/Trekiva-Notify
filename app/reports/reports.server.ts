@@ -6,9 +6,17 @@ import { variantLabels } from "../shopify/labels.server";
 import { env } from "../utils/env.server";
 import { logger } from "../utils/logger.server";
 import { isReportDue, type Frequency } from "./schedule";
+import { exportFiles } from "./export.server";
+import { formatsFor, kindOf } from "./format";
 import { renderReportEmail } from "./template";
 
 const MAX_ROWS = 25;
+
+const frequencyLabel = (f: Frequency) => ({ DAILY: "Daily", WEEKLY: "Weekly", MONTHLY: "Monthly" })[f];
+const dayLabel = (d: Date, timeZone: string) =>
+  new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone }).format(d);
+/** 2026-10-20 in the shop's time zone, for file names. */
+const dateStamp = (d: Date, timeZone: string) => new Intl.DateTimeFormat("en-CA", { timeZone }).format(d);
 
 const SHOP_QUERY = `#graphql
   query NotifyReportShop { shop { name ianaTimezone } }
@@ -56,7 +64,23 @@ export async function runReports(now = new Date()): Promise<{ sent: number; skip
       if (total > 0) {
         const top = groups.slice(0, MAX_ROWS);
         const labels = await variantLabels(admin, top.map((g) => g.variantId));
+        // Every request of the period goes into an Excel file: the email only has room for the top few.
+        const period = `${dayLabel(s.lastReportAt, shop.ianaTimezone)} - ${dayLabel(now, shop.ianaTimezone)}`;
+        const fileBase = `trekiva-notify-${frequency.toLowerCase()}-report-${dateStamp(now, shop.ianaTimezone)}`;
+        const exported = await exportFiles({
+          shopDomain: s.shopDomain,
+          admin,
+          formats: formatsFor(s.reportFormat),
+          fileBase,
+          title: `${frequencyLabel(frequency)} report`,
+          periodLabel: period,
+          topTitle: "Most requested this period",
+          where: { shopDomain: s.shopDomain, createdAt: { gt: s.lastReportAt, lte: now } },
+          shop: { name: shop.name, timeZone: shop.ianaTimezone },
+          now,
+        });
         const mail = renderReportEmail({
+          attachments: exported.files.map((f) => ({ name: f.filename, kind: kindOf(f.format) })),
           shopName: shop.name,
           frequency,
           total,
@@ -70,6 +94,7 @@ export async function runReports(now = new Date()): Promise<{ sent: number; skip
           subject: mail.subject,
           html: mail.html,
           text: mail.text,
+          attachments: exported.files.map((f) => ({ filename: f.filename, content: f.content })),
         });
         // Not advancing the clock on a failed send means the next run tries the same period again.
         if (error) throw new Error(error.message);

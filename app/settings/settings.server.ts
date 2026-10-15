@@ -29,6 +29,7 @@ export async function loadSettings(shopDomain: string) {
     reportHour: row?.reportHour ?? 10,
     reportWeekday: row?.reportWeekday ?? 2,
     reportMonthDay: row?.reportMonthDay ?? 1,
+    reportFormat: (row?.reportFormat ?? "EXCEL") as "EXCEL" | "PDF" | "BOTH",
     reportEmail: row?.reportEmail ?? "",
     reportCc: row?.reportCc ?? [],
     embedActivated: row?.embedActivated ?? false,
@@ -75,6 +76,7 @@ export async function saveGeneral(shopDomain: string, v: GeneralValues): Promise
     reportHour: v.reportHour,
     reportWeekday: v.reportWeekday,
     reportMonthDay: v.reportMonthDay,
+    reportFormat: v.reportFormat,
     reportEmail: v.reportEmail || null,
     reportCc: v.reportCc,
   };

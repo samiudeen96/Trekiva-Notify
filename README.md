@@ -39,6 +39,6 @@ Every call sends `Authorization: Bearer $CRON_SECRET`.
 - `app/restock/` stock decision, email queue, worker, reconcile
 - `app/email/` Resend client, email template, sender address
 - `app/settings/` defaults, validation schemas, persistence
-- `app/reports/` report schedule and email
+- `app/reports/` report schedule, report email, and the Excel workbook and PDF (summary + requests, with product / variant / SKU names) attached to reports (Settings: Excel, PDF or both) and used by the Subscribers export
 - `extensions/trekiva-notify/` storefront script, styles and theme blocks
 # Trekiva-Notify

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isReportDue, nextReportAt, zonedInstant, type ReportSchedule } from "./schedule";
+import { isReportDue, nextReportAt, shiftToZone, zonedInstant, type ReportSchedule } from "./schedule";
 
 const IST = "Asia/Kolkata";
 const NY = "America/New_York";
@@ -16,6 +16,13 @@ describe("zonedInstant", () => {
   it("handles daylight saving", () => {
     expect(zonedInstant({ y: 2026, m: 7, d: 1 }, 10, NY).toISOString()).toBe("2026-07-01T14:00:00.000Z"); // EDT
     expect(zonedInstant({ y: 2026, m: 1, d: 6 }, 10, NY).toISOString()).toBe("2026-01-06T15:00:00.000Z"); // EST
+  });
+});
+
+describe("shiftToZone", () => {
+  it("makes the UTC clock read local time", () => {
+    expect(shiftToZone(at("2026-10-14T05:00:00Z"), IST).toISOString()).toBe("2026-10-14T10:30:00.000Z");
+    expect(shiftToZone(at("2026-07-01T14:00:00Z"), NY).toISOString()).toBe("2026-07-01T10:00:00.000Z");
   });
 });
 

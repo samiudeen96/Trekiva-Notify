@@ -43,5 +43,8 @@ Use a development store, or a test product on your real store. Keep the Resend d
 ## Safety nets
 - [ ] Missed webhook: sign up, restock the variant while the app is stopped, start the app and call `/api/cron/reconcile` with the secret: the email goes out.
 - [ ] Cron endpoints without or with a wrong secret return 401.
-- [ ] Reports: Settings → Weekly report to your address, then (for a test) set `lastReportAt` back in the database and call `/api/cron/reports`: the summary arrives.
+- [ ] Reports: Settings → Send a sample report: the email arrives with an Excel file attached; open it and check both sheets (Summary and Requests).
+- [ ] Reports: Settings → Weekly report to your address, then (for a test) set `lastReportAt` back in the database and call `/api/cron/reports`: the summary arrives with every new request in the attached Excel file.
+- [ ] Subscribers → Export Excel, Export PDF and Export CSV (with and without a status filter): each opens, the filter is applied, times are in your store's time zone, and product, variant and SKU are names (not ids).
+- [ ] Settings → File attached to the report: pick Excel, PDF, then Excel and PDF and use Send a sample report each time; the right attachment(s) arrive.
 - [ ] Theme editor preview mode: the button does not appear while editing.

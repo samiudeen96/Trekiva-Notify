@@ -16,6 +16,21 @@ describe("renderReportEmail", () => {
     expect(r.html).not.toContain("<img");
   });
 
+  it("points to the Excel attachment when there is one", () => {
+    const r = renderReportEmail({ ...base, total: 1, rows: [], attachments: [{ name: "report.xlsx", kind: "Excel" }] });
+    expect(r.html).toContain("attached Excel file");
+    expect(r.text).toContain("attached Excel file");
+    expect(renderReportEmail({ ...base, total: 1, rows: [] }).html).not.toContain("attached");
+  });
+
+  it("describes a PDF, and both files", () => {
+    const pdf = renderReportEmail({ ...base, total: 1, rows: [], attachments: [{ name: "r.pdf", kind: "PDF" }] });
+    expect(pdf.text).toContain("attached PDF");
+    const both = renderReportEmail({ ...base, total: 1, rows: [], attachments: [{ name: "r.xlsx", kind: "Excel" }, { name: "r.pdf", kind: "PDF" }] });
+    expect(both.text).toContain("Excel file");
+    expect(both.text).toContain("PDF");
+  });
+
   it("blocks a non-http link", () => {
     expect(renderReportEmail({ ...base, adminUrl: "javascript:alert(1)", total: 1, rows: [] }).html).not.toContain("javascript:");
   });

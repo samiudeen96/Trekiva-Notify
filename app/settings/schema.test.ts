@@ -36,7 +36,7 @@ describe("editorSchema", () => {
 describe("generalSchema", () => {
   const base = {
     enabled: true, senderEmail: "", replyTo: "", enabledLocationIds: [],
-    minStockThreshold: 1, reportFrequency: "", reportHour: 10, reportWeekday: 2, reportMonthDay: 1, reportEmail: "", reportCc: [],
+    minStockThreshold: 1, reportFrequency: "", reportHour: 10, reportWeekday: 2, reportMonthDay: 1, reportFormat: "EXCEL", reportEmail: "", reportCc: [],
   };
 
   it("accepts blank optional fields", () => {

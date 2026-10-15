@@ -11,6 +11,8 @@ export interface ReportInput {
   total: number;
   rows: ReportRow[]; // most requested first
   adminUrl: string;
+  /** The files attached to the email, so the email can point to them. */
+  attachments?: { name: string; kind: "Excel" | "PDF" }[];
 }
 
 const PERIOD = { DAILY: "daily", WEEKLY: "weekly", MONTHLY: "monthly" } as const;
@@ -19,6 +21,19 @@ export function renderReportEmail(r: ReportInput): { subject: string; html: stri
   const period = PERIOD[r.frequency];
   const noun = r.total === 1 ? "request" : "requests";
   const subject = `Notify me ${period} report: ${r.total} new ${noun}`;
+
+  const kinds = [...new Set((r.attachments ?? []).map((a) => a.kind))];
+  const attachmentText =
+    kinds.length === 0
+      ? ""
+      : kinds.length === 2
+        ? "The full list is attached as an Excel file (filter and sort it) and a PDF (to read or print)."
+        : kinds[0] === "Excel"
+          ? "Every request is in the attached Excel file: filter and sort it however you like."
+          : "The attached PDF has the summary and the latest requests, ready to read or print.";
+  const attachmentHtml = attachmentText
+    ? `<p style="margin:18px 0 0;font-size:13px;color:#6d7175;">${escapeHtml(attachmentText)}</p>`
+    : "";
 
   const body = r.rows
     .map(
@@ -39,6 +54,7 @@ export function renderReportEmail(r: ReportInput): { subject: string; html: stri
 <tr><td style="padding-bottom:6px;color:#6d7175;">Product</td><td style="padding-bottom:6px;color:#6d7175;text-align:right;">Requests</td></tr>
 ${body}
 </table>
+${attachmentHtml}
 <p style="margin:20px 0 0;"><a href="${escapeHtml(safeLink)}" style="color:#111;font-weight:600;">View all subscribers</a></p>
 </td></tr></table></body></html>`;
 
@@ -47,6 +63,7 @@ ${body}
     "",
     ...r.rows.map((row) => `${row.count} x ${row.item}`),
     "",
+    ...(attachmentText ? [attachmentText, ""] : []),
     `View all subscribers: ${r.adminUrl}`,
   ].join("\n");
 
