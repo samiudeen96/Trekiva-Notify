@@ -1,13 +1,16 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
+import { useState } from "react";
 import { useLoaderData, useNavigate, useNavigation, useSubmit } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { variantLabels } from "../shopify/labels.server";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { Avatar, EmptyState, STATUS_LABEL, StatGrid, StatTile, StatusBadge } from "../components/ui";
 import { timeAgo } from "../utils/format";
 
-const PAGE_SIZE = 25;
+// Rows per page. The page numbers, the footer text and the query all use this one value.
+const PAGE_SIZE = 15;
 const STATUSES = ["PENDING", "NOTIFIED", "UNSUBSCRIBED", "FAILED"] as const;
 type Status = (typeof STATUSES)[number];
 
@@ -71,6 +74,9 @@ export default function Subscribers() {
   const navigate = useNavigate();
   const submit = useSubmit();
   const busy = useNavigation().state !== "idle";
+  const filtered = Boolean(q || status);
+  // The request waiting for the delete confirmation popup.
+  const [target, setTarget] = useState<{ id: string; email: string; item: string; status: Status } | null>(null);
 
   // Each control keeps the others' values, so changing one filter never drops the rest.
   const go = (p: number, next: { q?: string; status?: string } = {}) => {
@@ -103,16 +109,31 @@ export default function Subscribers() {
         </StatGrid>
       </s-section>
       <s-section padding="none">
+        {/* Filters share one row: status on the left, search taking the rest. */}
         <s-box padding="base">
-          <s-select
-            label="Status"
-            labelAccessibilityVisibility="exclusive"
-            value={status}
-            onChange={(e: Event) => go(1, { status: (e.currentTarget as HTMLSelectElement).value })}
+          <s-grid
+            gridTemplateColumns={`@container (inline-size <= 640px) 1fr, 1fr 2fr${filtered ? " auto" : ""}`}
+            gap="small-200"
+            alignItems="end"
           >
-            <s-option value="">All statuses</s-option>
-            {STATUSES.map((s) => <s-option key={s} value={s}>{STATUS_LABEL[s]}</s-option>)}
-          </s-select>
+            <s-select
+              label="Status"
+              labelAccessibilityVisibility="exclusive"
+              value={status}
+              onChange={(e: Event) => go(1, { status: (e.currentTarget as HTMLSelectElement).value })}
+            >
+              <s-option value="">All statuses</s-option>
+              {STATUSES.map((s) => <s-option key={s} value={s}>{STATUS_LABEL[s]}</s-option>)}
+            </s-select>
+            <s-search-field
+              label="Search subscribers"
+              labelAccessibilityVisibility="exclusive"
+              placeholder="Search by email"
+              value={q}
+              onChange={(e: Event) => go(1, { q: (e.currentTarget as HTMLInputElement).value.trim() })}
+            />
+            {filtered && <s-button variant="tertiary" onClick={() => navigate("/app/subscribers")}>Clear filters</s-button>}
+          </s-grid>
         </s-box>
         <s-table
           variant="auto"
@@ -121,14 +142,6 @@ export default function Subscribers() {
             : {})}
           {...(busy ? { loading: true } : {})}
         >
-          <s-search-field
-            slot="filters"
-            label="Search subscribers"
-            labelAccessibilityVisibility="exclusive"
-            placeholder="Search by email"
-            value={q}
-            onChange={(e: Event) => go(1, { q: (e.currentTarget as HTMLInputElement).value.trim() })}
-          />
           <s-table-header-row>
             <s-table-header listSlot="primary">Email</s-table-header>
             <s-table-header listSlot="secondary">Product</s-table-header>
@@ -156,7 +169,7 @@ export default function Subscribers() {
                 <s-table-cell>{r.marketing ? "Yes" : "No"}</s-table-cell>
                 <s-table-cell>
                   <s-button tone="critical" variant="tertiary"
-                    onClick={() => { if (window.confirm(`Delete the request from ${r.email}?`)) submit({ intent: "delete", id: r.id }, { method: "post" }); }}>
+                    onClick={() => setTarget({ id: r.id, email: r.email, item: r.item, status: r.status as Status })}>
                     Delete
                   </s-button>
                 </s-table-cell>
@@ -166,17 +179,45 @@ export default function Subscribers() {
         </s-table>
         {rows.length === 0 && (
           <EmptyState
-            title={q || status ? "No matching requests" : "No requests yet"}
+            title={filtered ? "No matching requests" : "No requests yet"}
             description={
-              q || status
+              filtered
                 ? "Try a different search or clear the status filter."
                 : "When a customer taps Notify me on a sold-out product, the request shows up here."
             }
-            {...(q || status ? { actionLabel: "Clear filters", actionHref: "/app/subscribers" } : {})}
+            {...(filtered ? { actionLabel: "Clear filters", actionHref: "/app/subscribers" } : {})}
           />
         )}
-        <s-box padding="base"><s-text color="subdued">{total} request{total === 1 ? "" : "s"}</s-text></s-box>
+        <s-box padding="base">
+          <s-text color="subdued">
+            {total === 0
+              ? "0 requests"
+              : `Showing ${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, total)} of ${total} request${total === 1 ? "" : "s"}`}
+            {pages > 1 ? ` · Page ${page} of ${pages}` : ""}
+          </s-text>
+        </s-box>
       </s-section>
+      <ConfirmModal
+        open={target !== null}
+        heading={`Delete the request from ${target?.email ?? ""}?`}
+        confirmLabel="Delete request"
+        destructive
+        busy={busy}
+        onClose={() => setTarget(null)}
+        onConfirm={() => target && submit({ intent: "delete", id: target.id }, { method: "post" })}
+      >
+        <s-stack gap="small-200">
+          <s-text>
+            This removes the request for <s-text type="strong">{target?.item}</s-text> from Trekiva Notify.
+          </s-text>
+          {target?.status === "PENDING" ? (
+            <s-text color="subdued">This customer is still waiting, so they will not be emailed when the item is back in stock.</s-text>
+          ) : (
+            <s-text color="subdued">The email already sent to them stays in their inbox. Nothing changes in Shopify.</s-text>
+          )}
+          <s-text color="subdued">They can sign up again from the product page.</s-text>
+        </s-stack>
+      </ConfirmModal>
     </s-page>
   );
 }

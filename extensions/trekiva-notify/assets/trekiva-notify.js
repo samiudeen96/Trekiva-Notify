@@ -5,17 +5,27 @@
   "use strict";
   if (window.TrekivaNotify) return;
 
-  var root = document.getElementById("trekiva-notify-root");
-  if (!root || root.getAttribute("data-design-mode") === "true") return;
+  var cfgNode = document.getElementById("trekiva-notify-config");
+  if (!cfgNode) return;
+  var boot;
+  try { boot = JSON.parse(cfgNode.textContent); } catch (e) { return; }
+  if (boot.designMode) return;
 
-  var base = root.getAttribute("data-proxy-base") || "/apps/notify";
-  var pageType = root.getAttribute("data-page-type") || "";
-  var extraHide = (root.getAttribute("data-hide-selectors") || "").trim();
-  var customCard = (root.getAttribute("data-card-selector") || "").trim();
+  var rootEl = document.documentElement;
+  var base = boot.proxyBase || "/apps/notify";
+  var pageType = boot.pageType || "";
+  var extraHide = (boot.hideSelectors || "").trim();
+  var customCard = (boot.cardSelector || "").trim();
+  var hideEnabled = boot.hide !== false;
+  var EARLY_ID = "trekiva-notify-early";
 
-  var DEFAULT_HIDE =
-    'form[action*="/cart/add"] [type="submit"], form[action*="/cart/add"] button[name="add"], ' +
-    '.shopify-payment-button, [data-shopify="payment-button"]';
+  /* The theme embed hides the purchase buttons before first paint for a sold-out variant. Once this
+   * script owns the buttons (or decides not to touch them) that early style has to go. */
+  function releaseEarly() {
+    var n = document.getElementById(EARLY_ID);
+    if (n) n.remove();
+  }
+
   var DEFAULT_CARD = ".card-wrapper, .product-card, .product-item, .grid-product, .grid__item, article, li";
   var STORAGE_KEY = "trekiva-notify:subscribed";
 
@@ -46,10 +56,10 @@
 
   function applyTheme() {
     var b = cfg.button;
-    root.style.setProperty("--tn-fg", b.textColor);
-    root.style.setProperty("--tn-bg", b.background);
-    root.style.setProperty("--tn-radius", b.borderRadius + "px");
-    root.style.setProperty("--tn-sub", b.subtextColor);
+    rootEl.style.setProperty("--tn-fg", b.textColor);
+    rootEl.style.setProperty("--tn-bg", b.background);
+    rootEl.style.setProperty("--tn-radius", b.borderRadius + "px");
+    rootEl.style.setProperty("--tn-sub", b.subtextColor);
   }
 
   /* ---------- display rules ---------- */
@@ -261,7 +271,7 @@
 
   /* ---------- product page ---------- */
   var currentVariant = null;
-  var hiddenEls = [];
+  var customHideReady = false;
 
   function productForm() {
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
@@ -275,31 +285,45 @@
     return String((input && input.value) || fromUrl || (productData.variants[0] && productData.variants[0].id));
   }
 
-  function setPurchaseButtonsHidden(hide) {
-    hiddenEls.forEach(function (n) { n.removeAttribute("data-trekiva-hidden"); });
-    hiddenEls = [];
-    if (!hide) return;
-    var selector = extraHide ? DEFAULT_HIDE + ", " + extraHide : DEFAULT_HIDE;
-    var nodes;
-    try { nodes = document.querySelectorAll(selector); } catch (e) { return; } // a bad merchant selector must not break the page
-    Array.prototype.forEach.call(nodes, function (n) {
-      if (n.closest("[data-trekiva-notify-button]")) return;
-      n.setAttribute("data-trekiva-hidden", "");
-      hiddenEls.push(n);
+  function variantById(id) {
+    return productData.variants.filter(function (v) { return String(v.id) === id; })[0];
+  }
+
+  /* One rule per merchant selector: a single bad selector then only loses itself, not the others. */
+  function ensureCustomHide() {
+    if (customHideReady || !extraHide) return;
+    customHideReady = true;
+    var style = document.createElement("style");
+    document.head.appendChild(style);
+    extraHide.split(",").forEach(function (sel) {
+      sel = sel.trim();
+      if (!sel) return;
+      try { style.sheet.insertRule("html[data-tn-soldout] " + sel + " { display: none !important; }", style.sheet.cssRules.length); } catch (e) { /* invalid selector: skipped */ }
     });
+  }
+
+  function setSoldOutMode(on) {
+    if (on && hideEnabled) {
+      ensureCustomHide();
+      rootEl.setAttribute("data-tn-soldout", "");
+    } else {
+      rootEl.removeAttribute("data-tn-soldout");
+    }
   }
 
   function renderProduct() {
     var form = productForm();
     if (!form) return;
     var id = selectedVariantId(form);
-    var variant = productData.variants.filter(function (v) { return String(v.id) === id; })[0];
+    var variant = variantById(id);
 
     var existing = document.querySelector("[data-trekiva-notify-button]");
     if (existing) existing.remove();
-    setPurchaseButtonsHidden(false);
 
-    if (!variant || variant.available) return;
+    if (!variant || variant.available) {
+      setSoldOutMode(false);
+      return;
+    }
 
     var othersAvailable = productData.variants.some(function (v) { return v.available; });
     var wrap = buildButton(
@@ -316,27 +340,46 @@
       if (target === form) form.appendChild(wrap);
       else target.insertAdjacentElement("afterend", wrap);
     }
-    if (cfg.hidePurchaseButtons) setPurchaseButtonsHidden(true);
+    setSoldOutMode(true);
+  }
+
+  /* Re-renders only when the selection (or the theme re-drawing the form) makes it necessary. */
+  function checkVariant() {
+    var form = productForm();
+    if (!form) return;
+    var id = selectedVariantId(form);
+    var variant = variantById(id);
+    var soldOut = !!variant && !variant.available;
+    var hasButton = !!document.querySelector("[data-trekiva-notify-button]");
+    if (id !== currentVariant || soldOut !== hasButton) {
+      currentVariant = id;
+      renderProduct();
+    }
   }
 
   function startProductPage() {
     var node = document.getElementById("trekiva-notify-product");
-    if (!node) return;
-    try { productData = JSON.parse(node.textContent); } catch (e) { return; }
-    if (!ruleAllows(productData)) return;
+    if (!node) { releaseEarly(); return; }
+    try { productData = JSON.parse(node.textContent); } catch (e) { releaseEarly(); return; }
+    if (!ruleAllows(productData)) { releaseEarly(); return; }
 
-    // Themes change the selected variant by setting the hidden id input without firing a reliable
-    // DOM event, so the selection is polled: cheap, and independent of the theme.
     renderProduct();
-    window.setInterval(function () {
-      var id = selectedVariantId(productForm());
-      var needsButton = !document.querySelector("[data-trekiva-notify-button]");
-      var variant = productData.variants.filter(function (v) { return String(v.id) === id; })[0];
-      if (id !== currentVariant || (variant && !variant.available && needsButton)) {
-        currentVariant = id;
-        renderProduct();
-      }
-    }, 400);
+    // Our own state (data-tn-soldout, the button) now covers the buttons: the early style is not needed.
+    releaseEarly();
+
+    // Themes change the selected variant by setting the hidden id input, often without a DOM event. So
+    // react to the events that do exist (form changes, the URL changing) and keep a fast poll as backup.
+    document.addEventListener("change", function () { window.setTimeout(checkVariant, 0); }, true);
+    ["pushState", "replaceState"].forEach(function (m) {
+      var original = window.history[m];
+      window.history[m] = function () {
+        var result = original.apply(this, arguments);
+        window.setTimeout(checkVariant, 0);
+        return result;
+      };
+    });
+    window.addEventListener("popstate", checkVariant);
+    window.setInterval(checkVariant, 150);
   }
 
   /* ---------- cards (collection, search, home) ---------- */
@@ -409,38 +452,64 @@
     else scanCards();
   }
 
-  function loadCss() {
-    return new Promise(function (resolve) {
-      var href = root.getAttribute("data-css");
-      if (!href) return resolve();
-      var link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = href;
-      link.onload = link.onerror = function () { resolve(); };
-      document.head.appendChild(link);
-      window.setTimeout(resolve, 3000);
-    });
+  /* ---------- settings: cached copy first, refreshed in the background ---------- */
+  var CFG_KEY = "trekiva-notify:cfg";
+  var CFG_MAX_AGE = 7 * 86400000;
+
+  function readCachedCfg() {
+    try {
+      var raw = JSON.parse(window.localStorage.getItem(CFG_KEY));
+      if (raw && raw.c && Date.now() - raw.t < CFG_MAX_AGE) return raw.c;
+    } catch (e) { /* no cache */ }
+    return null;
+  }
+
+  function fetchCfg() {
+    return fetch(base + "/config", { credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (c) {
+        if (c) {
+          try { window.localStorage.setItem(CFG_KEY, JSON.stringify({ t: Date.now(), c: c })); } catch (e) { /* ignore */ }
+        }
+        return c;
+      });
+  }
+
+  function onReady(fn) {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn);
+    else fn();
   }
 
   function start() {
-    fetch(base + "/config", { credentials: "same-origin" })
-      .then(function (r) { return r.ok ? r.json() : null; })
+    // With a cached copy there is nothing to wait for; the fresh copy is stored for the next page.
+    // Without one (first visit) the settings have to be fetched first.
+    var cached = readCachedCfg();
+    var ready;
+    if (cached) {
+      fetchCfg().catch(function () { /* the cached copy keeps working */ });
+      ready = Promise.resolve(cached);
+    } else {
+      ready = fetchCfg();
+    }
+
+    ready
       .then(function (c) {
-        if (!c || !c.enabled) return;
         var key = pageKey();
-        if (!key || (c.showOn || []).indexOf(key) === -1) return;
+        if (!c || !c.enabled || !key || (c.showOn || []).indexOf(key) === -1) { releaseEarly(); return; }
         cfg = c;
         applyTheme();
-        return loadCss().then(function () {
+        onReady(function () {
           if (key === "product") startProductPage();
           else startCards();
         });
       })
-      .catch(function () { /* the storefront must never break because the app is unreachable */ });
+      .catch(function () {
+        // The storefront must never break, or lose its buttons, because the app is unreachable.
+        releaseEarly();
+      });
   }
 
   captureAttribution();
   window.TrekivaNotify = { refresh: refresh };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
-  else start();
+  start();
 })();

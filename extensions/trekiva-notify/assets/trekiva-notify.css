@@ -1,4 +1,9 @@
-[data-trekiva-hidden] { display: none !important; }
+/* A sold-out variant is selected: the script sets data-tn-soldout on <html>. Done in CSS rather than per
+ * element so purchase buttons the theme re-renders on a variant change are hidden at once. */
+html[data-tn-soldout] form[action*="/cart/add"] [type="submit"],
+html[data-tn-soldout] form[action*="/cart/add"] button[name="add"],
+html[data-tn-soldout] .shopify-payment-button,
+html[data-tn-soldout] [data-shopify="payment-button"] { display: none !important; }
 
 .tn-wrap { margin: 12px 0; width: 100%; }
 .tn-btn {

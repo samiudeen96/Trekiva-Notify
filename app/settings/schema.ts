@@ -67,12 +67,14 @@ export type EditorValues = z.infer<typeof editorSchema>;
 /** The Settings page. */
 export const generalSchema = z.object({
   enabled: z.boolean(),
-  hidePurchaseButtons: z.boolean(),
   senderEmail: optionalEmail,
   replyTo: optionalEmail,
   enabledLocationIds: z.array(z.string().regex(/^gid:\/\/shopify\/Location\/\d+$/)).max(250),
   minStockThreshold: z.number().int().min(1).max(100000),
   reportFrequency: z.enum(["", "DAILY", "WEEKLY", "MONTHLY"]),
+  reportHour: z.number().int().min(0).max(23),
+  reportWeekday: z.number().int().min(0).max(6),
+  reportMonthDay: z.number().int().min(1).max(28),
   reportEmail: optionalEmail,
   reportCc: z.array(z.string().trim().toLowerCase().max(254).email()).max(10),
 });

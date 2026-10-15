@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -8,13 +8,15 @@ import { authenticate } from "../shopify.server";
 import { loadSettings, saveGeneral } from "../settings/settings.server";
 import { fieldErrors, generalSchema, type GeneralValues } from "../settings/schema";
 import { sendTestEmail } from "../email/test-email.server";
+import { sendSampleReport } from "../reports/test-report.server";
+import { nextReportAt } from "../reports/schedule";
 import { SettingsRow } from "../components/ui";
 import { addEmails } from "../subscriptions/email";
 import { env } from "../utils/env.server";
 
 const LOCATIONS_QUERY = `#graphql
   query NotifyLocations {
-    shop { name }
+    shop { name ianaTimezone }
     locations(first: 50) { nodes { id name isActive } }
   }
 `;
@@ -24,9 +26,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const settings = await loadSettings(session.shop);
 
   let locations: { id: string; name: string }[] = [];
+  let timeZone = "UTC";
   try {
     const res = await admin.graphql(LOCATIONS_QUERY);
-    const json = (await res.json()) as { data?: { locations: { nodes: { id: string; name: string; isActive: boolean }[] } } };
+    const json = (await res.json()) as {
+      data?: { shop: { ianaTimezone: string }; locations: { nodes: { id: string; name: string; isActive: boolean }[] } };
+    };
+    timeZone = json.data?.shop.ianaTimezone ?? timeZone;
     locations = (json.data?.locations.nodes ?? []).filter((l) => l.isActive).map((l) => ({ id: l.id, name: l.name }));
   } catch {
     // The locations list is optional: with none shown, every location triggers alerts.
@@ -34,21 +40,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const values: GeneralValues = {
     enabled: settings.enabled,
-    hidePurchaseButtons: settings.hidePurchaseButtons,
     senderEmail: settings.senderEmail,
     replyTo: settings.replyTo,
     enabledLocationIds: settings.enabledLocationIds,
     minStockThreshold: settings.minStockThreshold,
     reportFrequency: settings.reportFrequency,
+    reportHour: settings.reportHour,
+    reportWeekday: settings.reportWeekday,
+    reportMonthDay: settings.reportMonthDay,
     reportEmail: settings.reportEmail,
     reportCc: settings.reportCc,
   };
-  return { values, locations, defaultFrom: env.EMAIL_FROM ?? "", resendReady: Boolean(env.RESEND_API_KEY && env.EMAIL_FROM) };
+  const embedUrl = `https://${session.shop}/admin/themes/current/editor?context=apps&activateAppId=${env.SHOPIFY_API_KEY}/notify-embed`;
+  return { values, locations, timeZone, embedUrl, defaultFrom: env.EMAIL_FROM ?? "", resendReady: Boolean(env.RESEND_API_KEY && env.EMAIL_FROM) };
 };
 
 const bodySchema = z.discriminatedUnion("intent", [
   z.object({ intent: z.literal("save"), values: generalSchema }),
   z.object({ intent: z.literal("test"), to: z.string().trim().toLowerCase().max(254).email() }),
+  z.object({ intent: z.literal("sampleReport") }),
 ]);
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -63,14 +73,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const settings = await loadSettings(session.shop);
   let shopName = session.shop;
+  if (parsed.data.intent === "sampleReport" && !settings.reportEmail) {
+    return { kind: "test" as const, ok: false, errors: {} as Record<string, string>, message: "Save a Send to email first." };
+  }
   try {
     const res = await admin.graphql(`#graphql\n query NotifyShopName { shop { name } }`);
     shopName = ((await res.json()) as { data?: { shop: { name: string } } }).data?.shop.name ?? shopName;
   } catch {
     /* the myshopify domain is a fine fallback name */
   }
+  if (parsed.data.intent === "sampleReport") {
+    const sample = await sendSampleReport({
+      to: settings.reportEmail,
+      cc: settings.reportCc,
+      shopName,
+      frequency: settings.reportFrequency || "WEEKLY",
+      senderEmail: settings.senderEmail,
+      adminUrl: `https://${session.shop}/admin/apps`,
+    });
+    return {
+      kind: "test" as const,
+      ok: sample.ok,
+      errors: {} as Record<string, string>,
+      message: sample.ok ? `Sample report sent to ${settings.reportEmail}.` : sample.error,
+    };
+  }
   const result = await sendTestEmail({
-    to: parsed.data.to,
+    to: (parsed.data as { to: string }).to,
     shopName,
     emailConfig: settings.editor.email,
     senderEmail: settings.senderEmail,
@@ -80,13 +109,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     kind: "test" as const,
     ok: result.ok,
     errors: {} as Record<string, string>,
-    message: result.ok ? `Test email sent to ${parsed.data.to}.` : result.error,
+    message: result.ok ? `Test email sent to ${(parsed.data as { to: string }).to}.` : result.error,
   };
 };
 
 const val = (e: Event) => (e.currentTarget as HTMLInputElement).value;
 const checked = (e: Event) => (e.currentTarget as HTMLInputElement).checked;
 const MAX_CC = 10;
+
+const WEEKDAYS: [number, string][] = [[1, "Monday"], [2, "Tuesday"], [3, "Wednesday"], [4, "Thursday"], [5, "Friday"], [6, "Saturday"], [0, "Sunday"]];
+const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12}:00 ${h < 12 ? "AM" : "PM"}`;
+const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10 > 3 ? 0 : n % 10]}`;
+
+// The current minute, or 0 while rendering on the server: the "next report" line only appears in the browser.
+const minuteNow = () => Math.floor(Date.now() / 60_000);
+const subscribeNone = () => () => {};
 
 export default function Settings() {
   const loaded = useLoaderData<typeof loader>();
@@ -95,6 +132,7 @@ export default function Settings() {
   const testFetcher = useFetcher<typeof action>();
 
   const [values, setValues] = useState<GeneralValues>(loaded.values);
+  const nowMinute = useSyncExternalStore(subscribeNone, minuteNow, () => 0);
   const [ccInput, setCcInput] = useState("");
   const [ccError, setCcError] = useState<string | null>(null);
   const [testTo, setTestTo] = useState("");
@@ -139,6 +177,24 @@ export default function Settings() {
   const sendTest = () =>
     testFetcher.submit({ intent: "test", to: testTo } as unknown as Record<string, never>, { method: "post", encType: "application/json" });
 
+  // When the next report goes out, in the store's time zone, from what is currently selected.
+  const nextReport = useMemo(() => {
+    if (!values.reportFrequency || !nowMinute) return null;
+    const at = nextReportAt({
+      frequency: values.reportFrequency,
+      hour: values.reportHour,
+      weekday: values.reportWeekday,
+      monthDay: values.reportMonthDay,
+      now: new Date(nowMinute * 60_000),
+      timeZone: loaded.timeZone,
+    });
+    return at
+      ? new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: loaded.timeZone }).format(at)
+      : null;
+  }, [values.reportFrequency, values.reportHour, values.reportWeekday, values.reportMonthDay, nowMinute, loaded.timeZone]);
+  const sendSample = () =>
+    testFetcher.submit({ intent: "sampleReport" } as unknown as Record<string, never>, { method: "post", encType: "application/json" });
+
   const toggleLocation = (id: string, on: boolean) =>
     set({ enabledLocationIds: on ? [...values.enabledLocationIds.filter((x) => x !== id), id] : values.enabledLocationIds.filter((x) => x !== id) });
 
@@ -180,9 +236,10 @@ export default function Settings() {
         <SettingsRow title="Storefront" description="Control the Notify me button on your store.">
           <s-switch label="Back in stock alert" details="Show the Notify me button and send restock emails."
             checked={values.enabled} onChange={(e: Event) => set({ enabled: checked(e) })} />
-          <s-switch label="Replace Add to cart and Buy it now when sold out"
-            details="Hides the purchase buttons for a sold-out variant so only Notify me shows."
-            checked={values.hidePurchaseButtons} onChange={(e: Event) => set({ hidePurchaseButtons: checked(e) })} />
+          <s-text color="subdued">
+            Hiding Add to cart and Buy it now on a sold-out variant is set in your theme, so it applies before the page
+            finishes loading: <s-link href={loaded.embedUrl} target="_blank">open the app embed settings</s-link>.
+          </s-text>
         </SettingsRow>
         <s-divider />
 
@@ -205,7 +262,7 @@ export default function Settings() {
         <s-divider />
 
         <SettingsRow title="Notify me request alerts"
-          description="Get a summary of new requests so you can track demand and restock at the right time. Sent only when there are new requests: daily at 4 AM, weekly on Tuesday 10 AM, monthly on the first Tuesday 10 AM (store time).">
+          description="Get a summary of new requests so you can track demand and restock at the right time. Choose how often and when it arrives. A report is sent only when there are new requests.">
           <s-choice-list label="Send summary requests in" name="frequency" values={[values.reportFrequency || "NONE"]}
             onChange={(e: Event) => {
               const next = (e.currentTarget as HTMLElement & { values?: string[] }).values?.[0] ?? "NONE";
@@ -216,6 +273,33 @@ export default function Settings() {
             <s-choice value="WEEKLY">Weekly report</s-choice>
             <s-choice value="MONTHLY">Monthly report</s-choice>
           </s-choice-list>
+          {values.reportFrequency && (
+            <s-box padding="base" border="base" borderRadius="base" background="subdued">
+              <s-stack gap="base">
+                <s-grid gridTemplateColumns={`@container (inline-size <= 480px) 1fr, ${values.reportFrequency === "DAILY" ? "1fr" : "1fr 1fr"}`} gap="small-200">
+                  {values.reportFrequency === "WEEKLY" && (
+                    <s-select label="Day of the week" value={String(values.reportWeekday)}
+                      onChange={(e: Event) => set({ reportWeekday: Number((e.currentTarget as HTMLSelectElement).value) })}>
+                      {WEEKDAYS.map(([d, name]) => <s-option key={d} value={String(d)}>{name}</s-option>)}
+                    </s-select>
+                  )}
+                  {values.reportFrequency === "MONTHLY" && (
+                    <s-select label="Day of the month" value={String(values.reportMonthDay)}
+                      onChange={(e: Event) => set({ reportMonthDay: Number((e.currentTarget as HTMLSelectElement).value) })}>
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => <s-option key={d} value={String(d)}>{ordinal(d)}</s-option>)}
+                    </s-select>
+                  )}
+                  <s-select label="Time" value={String(values.reportHour)}
+                    onChange={(e: Event) => set({ reportHour: Number((e.currentTarget as HTMLSelectElement).value) })}>
+                    {Array.from({ length: 24 }, (_, h) => h).map((h) => <s-option key={h} value={String(h)}>{hourLabel(h)}</s-option>)}
+                  </s-select>
+                </s-grid>
+                <s-text color="subdued">
+                  {nextReport ? `Next report: ${nextReport}` : "Next report: shown once the page has loaded"} ({loaded.timeZone}, your store&apos;s time zone).
+                </s-text>
+              </s-stack>
+            </s-box>
+          )}
           <s-email-field autocomplete="off" name="notify-report-recipient" label="Send to email" value={values.reportEmail}
             error={errors.reportEmail} onInput={(e: Event) => set({ reportEmail: val(e) })} />
           <s-stack gap="small-200">
@@ -243,6 +327,17 @@ export default function Settings() {
               </div>
             )}
           </s-stack>
+          {values.reportFrequency && (
+            <div>
+              <s-button onClick={sendSample} {...(testFetcher.state !== "idle" ? { loading: true } : {})}
+                {...(values.reportEmail && !dirty ? {} : { disabled: true })}>
+                Send a sample report
+              </s-button>
+              <div style={{ paddingTop: 6 }}>
+                <s-text color="subdued">Sends example numbers to your Send to address (and CC). Save your changes first.</s-text>
+              </div>
+            </div>
+          )}
         </SettingsRow>
       </s-section>
     </s-page>

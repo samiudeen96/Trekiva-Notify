@@ -120,6 +120,9 @@ model Settings {
   embedActivated     Boolean  @default(false)
   setupConfirmed     Boolean  @default(false)
   lastReportAt       DateTime?
+  reportHour         Int      @default(10)   // 0-23, in the shop's time zone
+  reportWeekday      Int      @default(2)    // weekly reports: 0 = Sunday ... 6 = Saturday
+  reportMonthDay     Int      @default(1)    // monthly reports: 1-28
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }

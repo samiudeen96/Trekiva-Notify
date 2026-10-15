@@ -1,22 +1,31 @@
 {%- comment -%}
   Trekiva Notify app embed. Enable it in Online Store > Themes > Customize > App embeds.
-  It covers every page that shows products (product, collection, search, home). All settings come
-  from the app proxy; nothing secret is rendered here.
+  It covers every page that shows products (product, collection, search, home). Presentation settings
+  come from the app proxy; nothing secret is rendered here.
 
-  Nothing here may block the page: the stylesheet URL is only passed along and the deferred script
-  loads it once the page has finished loading (a <link rel="stylesheet"> in the body would hold back
-  every script after it).
+  This block targets <head> on purpose: the stylesheet and the "sold out" style below are in place
+  before the first paint, so a sold-out variant never flashes its native Add to cart / Buy it now.
 {%- endcomment -%}
-<div
-  id="trekiva-notify-root"
-  data-proxy-base="/apps/notify"
-  data-css="{{ 'trekiva-notify.css' | asset_url }}"
-  data-page-type="{{ request.page_type | escape }}"
-  data-design-mode="{{ request.design_mode }}"
-  data-hide-selectors="{{ block.settings.hide_selectors | escape }}"
-  data-card-selector="{{ block.settings.card_selector | escape }}"
-  hidden
-></div>
+{%- liquid
+  assign hide_early = false
+  if request.page_type == 'product' and product and block.settings.hide_purchase_buttons and request.design_mode == false
+    assign selected = product.selected_or_first_available_variant
+    unless selected.available
+      assign hide_early = true
+    endunless
+  endif
+-%}
+<link rel="stylesheet" href="{{ 'trekiva-notify.css' | asset_url }}">
+<script type="application/json" id="trekiva-notify-config">
+  {
+    "proxyBase": "/apps/notify",
+    "pageType": {{ request.page_type | json }},
+    "designMode": {{ request.design_mode | json }},
+    "hide": {{ block.settings.hide_purchase_buttons | json }},
+    "hideSelectors": {{ block.settings.hide_selectors | json }},
+    "cardSelector": {{ block.settings.card_selector | json }}
+  }
+</script>
 {%- if request.page_type == 'product' and product -%}
   <script type="application/json" id="trekiva-notify-product">
     {
@@ -32,13 +41,37 @@
     }
   </script>
 {%- endif -%}
+{%- if hide_early -%}
+  {%- comment -%}
+    The selected variant is sold out: hide the purchase buttons now, from the first paint. The script
+    removes this style as soon as it has taken over. If it never does (blocked, app down), the buttons
+    reappear by themselves after 4 seconds, so a customer is never left without them.
+  {%- endcomment -%}
+  <style id="trekiva-notify-early">
+    form[action*="/cart/add"] [type="submit"],
+    form[action*="/cart/add"] button[name="add"],
+    .shopify-payment-button,
+    [data-shopify="payment-button"] {
+      visibility: hidden;
+      animation: trekiva-notify-reveal 0s linear 4s forwards;
+    }
+    @keyframes trekiva-notify-reveal { to { visibility: visible; } }
+  </style>
+{%- endif -%}
 <script src="{{ 'trekiva-notify.js' | asset_url }}" defer></script>
 
 {% schema %}
 {
   "name": "Trekiva Notify",
-  "target": "body",
+  "target": "head",
   "settings": [
+    {
+      "type": "checkbox",
+      "id": "hide_purchase_buttons",
+      "label": "Replace Add to cart and Buy it now when sold out",
+      "info": "Hides the purchase buttons for a sold-out variant so only Notify me shows. Turn off to keep your theme's own sold-out behavior.",
+      "default": true
+    },
     {
       "type": "text",
       "id": "hide_selectors",

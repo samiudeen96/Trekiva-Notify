@@ -35,8 +35,8 @@ describe("editorSchema", () => {
 
 describe("generalSchema", () => {
   const base = {
-    enabled: true, hidePurchaseButtons: true, senderEmail: "", replyTo: "", enabledLocationIds: [],
-    minStockThreshold: 1, reportFrequency: "", reportEmail: "", reportCc: [],
+    enabled: true, senderEmail: "", replyTo: "", enabledLocationIds: [],
+    minStockThreshold: 1, reportFrequency: "", reportHour: 10, reportWeekday: 2, reportMonthDay: 1, reportEmail: "", reportCc: [],
   };
 
   it("accepts blank optional fields", () => {

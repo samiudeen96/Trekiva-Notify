@@ -220,7 +220,7 @@ Tabs: **Button · Signup Form · Email notification · Email settings**.
   2. **Storefront** — master toggle, hide-purchase-buttons toggle.
   3. **Location-based alerts** — checkboxes of the shop's locations (GraphQL `locations`); only restocks at ticked locations trigger alerts (none ticked = all).
   4. **Email delivery settings** — "Notify when stock is equal to or greater than N" (`minStockThreshold`, default 1).
-  5. **Notify me request alerts** — summary report to you: Daily / Weekly / Monthly, "Send to" email, CC list. Sent only when new requests exist (cron: daily 4 AM, weekly Tue 10 AM, monthly first Tue 10 AM, store timezone).
+  5. **Notify me request alerts** — summary report to you: Daily / Weekly / Monthly, "Send to" email, CC list. Sent only when new requests exist. The merchant picks the frequency (daily, weekly, monthly), the time of day (default 10 AM), the weekday (weekly) or the date 1-28 (monthly), all in the store's time zone; the page shows the next send time and can send a sample report.
 
 ### 7.6 Revenue converted (attribution)
 - Restock email "Buy now" link carries `?utm_source=trekiva_notify&notify=<unsubToken-or-subId>`.

@@ -56,7 +56,7 @@ Put `CRON_SECRET=...` at the top of the crontab (cron does not read `.env`).
 2. **Notify me → Customize**: set the button, signup form and email design. Check the live preview.
 3. **Settings → Sender**: set a reply-to and press **Send test** to see the real email.
 4. Optional: in the theme editor add the **Notify me button** block to the product template to control its position.
-5. If your theme leaves Add to cart / Buy it now visible on sold-out variants, add its selectors to the embed's "Extra selectors to hide" setting.
+5. Whether Add to cart / Buy it now are hidden on a sold-out variant is a setting on the app embed itself (theme editor → App embeds → Trekiva Notify), so it applies before the page paints. If your theme leaves other purchase buttons visible, add their selectors to "Extra selectors to hide".
 6. Run the checklist in [TESTING.md](TESTING.md), then press **Everything is great** in the setup guide.
 
 ## 8. Operations

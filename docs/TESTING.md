@@ -12,7 +12,9 @@ Use a development store, or a test product on your real store. Keep the Resend d
 - [ ] Select an in-stock variant: the original buttons return, Notify Me is gone. Switch back and forth several times.
 - [ ] Product with some variants in stock: the "mixed stock" subtext shows under the button.
 - [ ] Variant with continue-selling ON and 0 stock: no Notify Me button.
-- [ ] Setting "Hide Add to cart…" off: the theme's own sold-out behaviour is untouched.
+- [ ] Reload a sold-out variant's page several times: the native Add to cart / Buy it now never flash before Notify Me appears.
+- [ ] Theme editor → App embeds → Trekiva Notify → "Replace Add to cart and Buy it now when sold out" off: the theme's own sold-out behaviour is untouched.
+- [ ] Block the app (turn the server off) and reload: the native buttons come back by themselves within 4 seconds.
 
 ## Signup
 - [ ] Click Notify Me: the modal shows the right copy and the variant name.

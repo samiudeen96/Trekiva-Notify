@@ -11,7 +11,6 @@ import {
 
 export interface StorefrontConfig {
   enabled: boolean;
-  hidePurchaseButtons: boolean;
   showOn: string[];
   productRule: ProductRule;
   button: ButtonConfig;
@@ -37,7 +36,6 @@ export async function getStorefrontConfig(shopDomain: string): Promise<Storefron
   return {
     // A shop that never opened the admin has no row: the button defaults to on.
     enabled: row?.enabled ?? true,
-    hidePurchaseButtons: row?.hidePurchaseButtons ?? true,
     showOn: row?.showOn?.length ? row.showOn : DEFAULT_SHOW_ON,
     productRule: parseRule(row?.productRule),
     button: mergeConfig(DEFAULT_BUTTON, row?.buttonConfig),

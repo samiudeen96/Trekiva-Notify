@@ -40,7 +40,7 @@ export async function runReports(now = new Date()): Promise<{ sent: number; skip
       const shop = ((await res.json()) as { data?: { shop: { name: string; ianaTimezone: string } } }).data?.shop;
       if (!shop) throw new Error("shop lookup failed");
 
-      if (!isReportDue({ frequency, now, lastReportAt: s.lastReportAt, timeZone: shop.ianaTimezone })) {
+      if (!isReportDue({ frequency, hour: s.reportHour, weekday: s.reportWeekday, monthDay: s.reportMonthDay, now, lastReportAt: s.lastReportAt, timeZone: shop.ianaTimezone })) {
         skipped++;
         continue;
       }

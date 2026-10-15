@@ -38,32 +38,57 @@ function localDate(at: Date, timeZone: string): LocalDate {
   return { y: y!, m: m!, d: d! };
 }
 
-const TUESDAY = 2;
-const SLOT_HOUR: Record<Frequency, number> = { DAILY: 4, WEEKLY: 10, MONTHLY: 10 };
+export const DEFAULT_REPORT_HOUR = 10;
+export const DEFAULT_REPORT_WEEKDAY = 2; // Tuesday (0 = Sunday)
+export const DEFAULT_REPORT_MONTH_DAY = 1;
 
-function onSchedule(date: LocalDate, frequency: Frequency): boolean {
-  if (frequency === "DAILY") return true;
-  const weekday = new Date(Date.UTC(date.y, date.m - 1, date.d)).getUTCDay();
-  if (weekday !== TUESDAY) return false;
-  return frequency === "WEEKLY" || date.d <= 7; // monthly: the first Tuesday
+export interface ReportSchedule {
+  frequency: Frequency;
+  /** Hour of the day in the shop's time zone, 0-23. */
+  hour: number;
+  /** Weekly reports: 0 = Sunday ... 6 = Saturday. */
+  weekday: number;
+  /** Monthly reports: 1-28 (never 29-31, so every month has the day). */
+  monthDay: number;
+}
+
+function onSchedule(date: LocalDate, s: ReportSchedule): boolean {
+  if (s.frequency === "DAILY") return true;
+  if (s.frequency === "WEEKLY") return new Date(Date.UTC(date.y, date.m - 1, date.d)).getUTCDay() === s.weekday;
+  return date.d === s.monthDay;
+}
+
+function addDays(date: LocalDate, days: number): LocalDate {
+  const d = new Date(Date.UTC(date.y, date.m - 1, date.d + days));
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() };
 }
 
 /**
- * Whether a report slot (daily 4 AM, weekly Tuesday 10 AM, monthly first Tuesday 10 AM, in the
- * shop's time zone) fell after the last report and has already passed. Asking again right after a
- * report was sent is false, so a frequent cron cannot send the same report twice.
+ * Whether a report slot (the shop's chosen time, in its own time zone) fell after the last report and
+ * has already passed. Asking again right after a report was sent is false, so a frequent cron cannot
+ * send the same report twice.
  */
-export function isReportDue(opts: { frequency: Frequency; now: Date; lastReportAt: Date; timeZone: string }): boolean {
+export function isReportDue(opts: ReportSchedule & { now: Date; lastReportAt: Date; timeZone: string }): boolean {
   const today = localDate(opts.now, opts.timeZone);
-  const hour = SLOT_HOUR[opts.frequency];
   // 40 days back covers a month between slots plus a long outage of the scheduler.
   for (let back = 0; back <= 40; back++) {
-    const day = new Date(Date.UTC(today.y, today.m - 1, today.d - back));
-    const date = { y: day.getUTCFullYear(), m: day.getUTCMonth() + 1, d: day.getUTCDate() };
-    if (!onSchedule(date, opts.frequency)) continue;
-    const slot = zonedInstant(date, hour, opts.timeZone);
+    const date = addDays(today, -back);
+    if (!onSchedule(date, opts)) continue;
+    const slot = zonedInstant(date, opts.hour, opts.timeZone);
     if (slot > opts.now) continue; // today's slot is still ahead
     return slot > opts.lastReportAt;
   }
   return false;
+}
+
+/** The next time a report is due after `now`, for showing "Next report: ..." in the settings. */
+export function nextReportAt(opts: ReportSchedule & { now: Date; timeZone: string }): Date | null {
+  const today = localDate(opts.now, opts.timeZone);
+  for (let ahead = 0; ahead <= 62; ahead++) {
+    const date = addDays(today, ahead);
+    if (!onSchedule(date, opts)) continue;
+    const slot = zonedInstant(date, opts.hour, opts.timeZone);
+    if (slot > opts.now) return slot;
+  }
+  return null;
 }
