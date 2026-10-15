@@ -53,7 +53,7 @@ describe("buildWorkbook", () => {
     expect(ws.getCell("A8").value).toBe("Most requested this period");
     expect(ws.getCell("B10").value).toBe("Sandals - Olive / 6");
     expect(ws.getCell("E10").value).toBe(4);
-    expect(String(ws.getCell("F10").value)).toMatch(/^█+$/);
+    expect(String(ws.getCell("F10").value)).toMatch(/^█+ \d+%$/);
   });
 
   it("lists every request under a styled, filterable, frozen header", async () => {

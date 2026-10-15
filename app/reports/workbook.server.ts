@@ -2,6 +2,7 @@ import { PassThrough } from "node:stream";
 import ExcelJS from "exceljs";
 import { argb, KPI_STYLE, PALETTE, STATUS_STYLE } from "./palette";
 import { shiftToZone } from "./schedule";
+import { sharePercent } from "./share";
 
 export interface RequestRow {
   email: string;
@@ -131,7 +132,7 @@ function summarySheet(wb: ExcelJS.stream.xlsx.WorkbookWriter, input: WorkbookInp
   const head = ws.getRow(9);
   ws.mergeCells("B9:D9");
   head.height = 22;
-  [[1, "#"], [2, "Product"], [5, "Requests"], [6, "Share"]].forEach(([c, text]) => {
+  [[1, "#"], [2, "Product"], [5, "Requests"], [6, "Share of requests"]].forEach(([c, text]) => {
     const cell = head.getCell(c as number);
     cell.value = text as string;
     cell.font = { name: FONT, size: 10, bold: true, color: { argb: WHITE } };
@@ -150,7 +151,8 @@ function summarySheet(wb: ExcelJS.stream.xlsx.WorkbookWriter, input: WorkbookInp
     row.getCell(2).value = t.item;
     row.getCell(5).value = t.count;
     row.getCell(5).numFmt = "#,##0";
-    row.getCell(6).value = "█".repeat(Math.max(1, Math.round((t.count / maxCount) * 14)));
+    // A short bar (longest = the most requested product) and the real percentage of all requests.
+    row.getCell(6).value = `${"█".repeat(Math.max(1, Math.round((t.count / maxCount) * 9)))} ${sharePercent(t.count, input.kpis.newRequests)}`;
     for (let c = 1; c <= 6; c++) {
       const cell = row.getCell(c);
       cell.font = { name: FONT, size: 11, bold: c === 5, color: { argb: c === 6 ? GREEN : TEXT } };

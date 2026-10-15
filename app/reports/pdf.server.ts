@@ -1,5 +1,6 @@
 import path from "node:path";
 import PDFDocument from "pdfkit";
+import { sharePercent } from "./share";
 import { hash, KPI_LABELS, KPI_STYLE, PALETTE, STATUS_STYLE } from "./palette";
 import type { RequestRow, WorkbookInput } from "./workbook.server";
 
@@ -65,7 +66,7 @@ function summaryPage(doc: Doc, input: WorkbookInput): void {
   doc.text("#", M + 12, headY + 8, { lineBreak: false });
   doc.text("Product", M + 44, headY + 8, { lineBreak: false });
   doc.text("Requests", barX - 70, headY + 8, { width: 56, align: "right", lineBreak: false });
-  doc.text("Share", barX, headY + 8, { lineBreak: false });
+  doc.text("Share of requests", barX, headY + 8, { lineBreak: false });
 
   const rowH = 24;
   const max = Math.max(1, ...input.top.map((t) => t.count));
@@ -76,8 +77,11 @@ function summaryPage(doc: Doc, input: WorkbookInput): void {
     doc.font(BOLD).fontSize(10).fillColor(hash(PALETTE.muted)).text(String(i + 1), M + 12, y + 7, { lineBreak: false });
     doc.font(REGULAR).fontSize(10).fillColor(hash(PALETTE.text)).text(t.item, M + 44, y + 7, { width: barX - 140, height: 12, ellipsis: true, lineBreak: false });
     doc.font(BOLD).fontSize(10).fillColor(hash(PALETTE.text)).text(t.count.toLocaleString("en-IN"), barX - 70, y + 7, { width: 56, align: "right", lineBreak: false });
-    doc.roundedRect(barX, y + 9, 220, 7, 3.5).fill(hash("EEF0F2"));
-    doc.roundedRect(barX, y + 9, Math.max(7, (220 * t.count) / max), 7, 3.5).fill(hash(PALETTE.green));
+    // The bar compares products (longest = the most requested); the number is the real share of all requests.
+    doc.roundedRect(barX, y + 9, 170, 7, 3.5).fill(hash("EEF0F2"));
+    doc.roundedRect(barX, y + 9, Math.max(7, (170 * t.count) / max), 7, 3.5).fill(hash(PALETTE.green));
+    doc.font(BOLD).fontSize(9.5).fillColor(hash(PALETTE.text))
+      .text(sharePercent(t.count, input.kpis.newRequests), barX + 180, y + 7, { width: 40, lineBreak: false });
   });
   if (input.top.length === 0) {
     doc.font(REGULAR).fontSize(10).fillColor(hash(PALETTE.muted)).text("Nothing to rank yet.", M + 12, headY + 36, { lineBreak: false });
