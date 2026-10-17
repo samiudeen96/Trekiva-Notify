@@ -28,6 +28,11 @@ describe("editorSchema", () => {
     expect(editorSchema.safeParse({ ...editor, email: { ...DEFAULT_EMAIL, logoHeight: 500 } }).success).toBe(false);
   });
 
+  it("accepts the quick-buy drawer as its own place, alone or with pages", () => {
+    expect(editorSchema.safeParse({ ...editor, showOn: ["drawer"] }).success).toBe(true);
+    expect(editorSchema.safeParse({ ...editor, showOn: ["product", "collection", "search", "home", "drawer"] }).success).toBe(true);
+  });
+
   it("rejects unknown pages", () => {
     expect(editorSchema.safeParse({ ...editor, showOn: ["cart"] }).success).toBe(false);
   });

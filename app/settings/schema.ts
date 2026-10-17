@@ -39,7 +39,8 @@ export const emailSchema = z.object({
   accentColor: color,
 });
 
-export const SHOW_ON = ["product", "collection", "search", "home"] as const;
+// Where the button may show. "drawer" is the quick-buy drawer / popup, on whichever page it opens.
+export const SHOW_ON = ["product", "collection", "search", "home", "drawer"] as const;
 
 export const productRuleSchema = z
   .object({
@@ -59,7 +60,7 @@ export const editorSchema = z.object({
   button: buttonSchema,
   form: formSchema,
   email: emailSchema,
-  showOn: z.array(z.enum(SHOW_ON)).max(4),
+  showOn: z.array(z.enum(SHOW_ON)).max(5),
   productRule: productRuleSchema,
 });
 export type EditorValues = z.infer<typeof editorSchema>;

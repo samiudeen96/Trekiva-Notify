@@ -8,7 +8,7 @@ import { variantLabels } from "../shopify/labels.server";
 import { ActionCard, Avatar, EmptyState, StatGrid, StatTile, StatusBadge, type SubStatus } from "../components/ui";
 import { money, percent, timeAgo } from "../utils/format";
 
-const PAGE_LABEL: Record<string, string> = { product: "Product pages", collection: "Collections", search: "Search", home: "Home page" };
+const PAGE_LABEL: Record<string, string> = { product: "Product pages", collection: "Collections", search: "Search", home: "Home page", drawer: "Quick-buy drawers" };
 const RULE_LABEL: Record<string, string> = {
   ALL: "all sold-out products",
   EXCLUDE_PRODUCTS: "all except chosen products",

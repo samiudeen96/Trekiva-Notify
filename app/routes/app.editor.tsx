@@ -43,6 +43,7 @@ const PAGE_LABELS: Record<(typeof SHOW_ON)[number], string> = {
   collection: "Collection page",
   search: "Search page",
   home: "Home page",
+  drawer: "Quick-buy drawer",
 };
 
 const RULES: { mode: EditorValues["productRule"]["mode"]; label: string }[] = [
@@ -174,7 +175,7 @@ export default function Editor() {
                   </s-grid>
                 </Group>
 
-                <Group title="Show button on" hint="Pick the pages where customers can ask to be notified.">
+                <Group title="Show button on" hint="Each place is separate. A quick-buy drawer follows its own box, whichever page it opens on.">
                   <s-grid gridTemplateColumns="1fr 1fr" gap="small-200">
                     {SHOW_ON.map((p) => (
                       <s-checkbox key={p} label={PAGE_LABELS[p]} checked={values.showOn.includes(p)}

@@ -525,6 +525,7 @@
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     Array.prototype.forEach.call(forms, function (form) {
       if (form.hasAttribute("data-trekiva-notify-form") || !form.querySelector('[name="id"]')) return;
+      if (pageType === "product" && form === productForm()) return; // the page's own form is handled by the product page code
       var handle = handleForForm(form);
       if (!handle) return; // not sure which product this is: better to leave the theme's button alone
       form.setAttribute("data-trekiva-notify-form", handle);
@@ -533,28 +534,33 @@
     });
   }
 
-  function startCards() {
-    scanCards();
-    scanQuickForms();
-    // Remember which card was clicked: that is the product of the drawer that opens next.
-    document.addEventListener("click", function (e) {
-      var card = e.target.closest && e.target.closest(customCard || DEFAULT_CARD);
-      var handle = handleOfLink(card);
-      if (handle) {
-        lastCard = { handle: handle, at: Date.now() };
-        fetchProduct(handle); // start loading the variants now, while the drawer is still opening
-      }
-      // A variant pick changes the form a moment later: look again right after, not on the next poll.
-      window.setTimeout(tickQuickForms, 40);
-    }, true);
-    document.addEventListener("change", function () { window.setTimeout(tickQuickForms, 0); }, true);
+  /* Cards (collection, search, home) and quick-buy drawers are switched on separately; one observer serves both. */
+  function startListing(opts) {
+    if (opts.cards) scanCards();
+    if (opts.drawers) {
+      scanQuickForms();
+      // Remember which card was clicked: that is the product of the drawer that opens next.
+      document.addEventListener("click", function (e) {
+        var card = e.target.closest && e.target.closest(customCard || DEFAULT_CARD);
+        var handle = handleOfLink(card);
+        if (handle) {
+          lastCard = { handle: handle, at: Date.now() };
+          fetchProduct(handle); // start loading the variants now, while the drawer is still opening
+        }
+        // A variant pick changes the form a moment later: look again right after, not on the next poll.
+        window.setTimeout(tickQuickForms, 40);
+      }, true);
+      document.addEventListener("change", function () { window.setTimeout(tickQuickForms, 0); }, true);
+    }
 
     // Drawers are looked for on every change, without the delay the card scan uses.
     var timer = null;
     new MutationObserver(function () {
-      scanQuickForms();
-      window.clearTimeout(timer);
-      timer = window.setTimeout(scanCards, 250);
+      if (opts.drawers) scanQuickForms();
+      if (opts.cards) {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(scanCards, 250);
+      }
     }).observe(document.body, { childList: true, subtree: true });
   }
 
@@ -630,12 +636,21 @@
     ready
       .then(function (c) {
         var key = pageKey();
-        if (!c || !c.enabled || !key || (c.showOn || []).indexOf(key) === -1) { releaseEarly(); return; }
+        var showOn = (c && c.showOn) || [];
+        var onPage = !!key && showOn.indexOf(key) !== -1;
+        var onDrawers = showOn.indexOf("drawer") !== -1;
+        if (!c || !c.enabled || (!onPage && !onDrawers)) { releaseEarly(); return; }
         cfg = c;
         applyTheme();
         onReady(function () {
-          if (key === "product") startProductPage();
-          else startCards();
+          if (key === "product") {
+            if (onPage) startProductPage(); else releaseEarly();
+            if (onDrawers) startListing({ cards: false, drawers: true });
+          } else if (key) {
+            startListing({ cards: onPage, drawers: onDrawers });
+          } else if (onDrawers) {
+            startListing({ cards: false, drawers: true });
+          }
         });
       })
       .catch(function () {
