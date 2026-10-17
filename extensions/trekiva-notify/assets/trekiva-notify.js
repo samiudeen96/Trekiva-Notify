@@ -397,6 +397,20 @@
     return cardCache[handle];
   }
 
+  /* The block of a card that holds its text (title, price, swatches). The button goes at the end of that
+   * block so it flows under the swatches. Appended to the card itself, a theme's grid or absolutely
+   * positioned layout can drop it on top of the title. */
+  function infoBlockOf(card) {
+    var links = card.querySelectorAll('a[href*="/products/"]');
+    for (var i = 0; i < links.length; i++) {
+      if (!links[i].textContent.trim()) continue; // an image link has no text; the title link does
+      var node = links[i];
+      while (node.parentElement && node.parentElement !== card) node = node.parentElement;
+      return node === links[i] ? card : node;
+    }
+    return card;
+  }
+
   function scanCards() {
     var cardSelector = customCard || DEFAULT_CARD;
     var links = document.querySelectorAll('a[href*="/products/"]');
@@ -414,7 +428,7 @@
         if (p.available !== false || !ruleAllows({ id: p.id, tags: p.tags, collections: null })) return;
         if (card.querySelector("[data-trekiva-notify-button]")) return;
         var variants = p.variants.map(function (v) { return { id: v.id, title: v.title }; });
-        card.appendChild(buildButton({ productId: String(p.id), variants: variants, pageType: pageKey() === "home" ? "index" : pageKey() }, { card: true }));
+        infoBlockOf(card).appendChild(buildButton({ productId: String(p.id), variants: variants, pageType: pageKey() === "home" ? "index" : pageKey() }, { card: true }));
       });
     });
   }

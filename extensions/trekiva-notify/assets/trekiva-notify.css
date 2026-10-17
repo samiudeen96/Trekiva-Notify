@@ -21,7 +21,7 @@ form[data-tn-soldout] [data-shopify="payment-button"] { display: none !important
 .tn-btn:hover { opacity: 0.9; }
 .tn-btn[disabled] { opacity: 0.7; cursor: default; }
 .tn-sub { margin: 6px 0 0; font-size: 0.85em; color: var(--tn-sub, #6d7175); text-align: center; }
-.tn-wrap--card { margin: 8px 0 0; }
+.tn-wrap--card { margin: 10px 0 0; position: relative; z-index: 1; clear: both; }
 .tn-wrap--card .tn-btn { padding: 10px 14px; font-size: 0.9em; }
 
 .tn-overlay {
