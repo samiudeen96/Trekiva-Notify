@@ -385,10 +385,13 @@
   }
 
   /* ---------- cards (collection, search, home) ---------- */
+  var productNow = {}; // handle -> product, once loaded: lets a drawer render in the same tick it appears
+
   function fetchProduct(handle) {
     if (!cardCache[handle]) {
       cardCache[handle] = fetch("/products/" + encodeURIComponent(handle) + ".js", { credentials: "same-origin" })
         .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (p) { if (p) productNow[handle] = p; return p; })
         .catch(function () { return null; });
     }
     return cardCache[handle];
@@ -490,6 +493,20 @@
     if (quickForms.length === 0) { window.clearInterval(quickTimer); quickTimer = null; }
   }
 
+  function attachQuickForm(form, p) {
+    if (!p || !form.isConnected || !ruleAllows({ id: p.id, tags: p.tags, collections: null })) return;
+    var q = { form: form, product: p, current: null };
+    quickForms.push(q);
+    renderQuickNow(q);
+    if (!quickTimer) quickTimer = window.setInterval(tickQuickForms, 120);
+  }
+
+  /* First render happens at once, before the next paint: the theme's own button never gets a moment on screen. */
+  function renderQuickNow(q) {
+    q.current = quickVariantId(q);
+    renderQuick(q);
+  }
+
   function scanQuickForms() {
     var forms = document.querySelectorAll('form[action*="/cart/add"]');
     Array.prototype.forEach.call(forms, function (form) {
@@ -497,12 +514,8 @@
       var handle = handleForForm(form);
       if (!handle) return; // not sure which product this is: better to leave the theme's button alone
       form.setAttribute("data-trekiva-notify-form", handle);
-      fetchProduct(handle).then(function (p) {
-        if (!p || !form.isConnected || !ruleAllows({ id: p.id, tags: p.tags, collections: null })) return;
-        quickForms.push({ form: form, product: p, current: null });
-        if (!quickTimer) quickTimer = window.setInterval(tickQuickForms, 200);
-        tickQuickForms();
-      });
+      if (productNow[handle]) attachQuickForm(form, productNow[handle]); // already loaded: no waiting at all
+      else fetchProduct(handle).then(function (p) { attachQuickForm(form, p); });
     });
   }
 
@@ -513,12 +526,21 @@
     document.addEventListener("click", function (e) {
       var card = e.target.closest && e.target.closest(customCard || DEFAULT_CARD);
       var handle = handleOfLink(card);
-      if (handle) lastCard = { handle: handle, at: Date.now() };
+      if (handle) {
+        lastCard = { handle: handle, at: Date.now() };
+        fetchProduct(handle); // start loading the variants now, while the drawer is still opening
+      }
+      // A variant pick changes the form a moment later: look again right after, not on the next poll.
+      window.setTimeout(tickQuickForms, 40);
     }, true);
+    document.addEventListener("change", function () { window.setTimeout(tickQuickForms, 0); }, true);
+
+    // Drawers are looked for on every change, without the delay the card scan uses.
     var timer = null;
     new MutationObserver(function () {
+      scanQuickForms();
       window.clearTimeout(timer);
-      timer = window.setTimeout(function () { scanCards(); scanQuickForms(); }, 250);
+      timer = window.setTimeout(scanCards, 250);
     }).observe(document.body, { childList: true, subtree: true });
   }
 
