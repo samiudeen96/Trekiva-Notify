@@ -298,7 +298,9 @@
     extraHide.split(",").forEach(function (sel) {
       sel = sel.trim();
       if (!sel) return;
-      try { style.sheet.insertRule("html[data-tn-soldout] " + sel + " { display: none !important; }", style.sheet.cssRules.length); } catch (e) { /* invalid selector: skipped */ }
+      ["html[data-tn-soldout] ", "form[data-tn-soldout] "].forEach(function (scope) {
+        try { style.sheet.insertRule(scope + sel + " { display: none !important; }", style.sheet.cssRules.length); } catch (e) { /* invalid selector: skipped */ }
+      });
     });
   }
 
@@ -414,12 +416,109 @@
     });
   }
 
+  /* ---------- quick-buy drawers and popups (collection, search, home) ---------- */
+  // Themes open a drawer with a variant picker and an Add to cart form when a card is clicked. Each such
+  // form gets what the product page gets: while the picked variant is sold out, the purchase buttons in
+  // that form are replaced by Notify me.
+  var lastCard = null; // { handle, at }: the product whose card was clicked last
+  var quickForms = []; // { form, product, current }
+  var quickTimer = null;
+
+  function handleOfLink(root) {
+    var a = root && root.querySelector && root.querySelector('a[href*="/products/"]');
+    var m = a && /\/products\/([^/?#]+)/.exec(a.getAttribute("href") || "");
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  /* Which product a drawer's form belongs to: what the theme says, a product link in the drawer, or the card that was just clicked. */
+  function handleForForm(form) {
+    var tagged = form.closest("[data-product-handle]");
+    if (tagged && tagged.getAttribute("data-product-handle")) return tagged.getAttribute("data-product-handle");
+    var url = form.getAttribute("data-product-url") || form.getAttribute("data-product-handle");
+    if (url) { var m = /\/products\/([^/?#]+)/.exec(url); return m ? m[1] : url; }
+    var shell = form.closest('dialog, [role="dialog"], [aria-modal="true"], [class*="drawer"], [class*="modal"], [class*="quick"]');
+    var fromShell = handleOfLink(shell);
+    if (fromShell) return fromShell;
+    if (lastCard && Date.now() - lastCard.at < 15000) return lastCard.handle;
+    return null;
+  }
+
+  function quickVariantId(q) {
+    var input = q.form.querySelector('[name="id"]');
+    return input ? String(input.value) : "";
+  }
+
+  function visible(el) { return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length); }
+
+  function renderQuick(q) {
+    var id = quickVariantId(q);
+    var variant = q.product.variants.filter(function (v) { return String(v.id) === id; })[0];
+    var existing = q.form.querySelector("[data-trekiva-notify-button]");
+    if (existing) existing.remove();
+
+    if (!variant || variant.available) {
+      q.form.removeAttribute("data-tn-soldout");
+      return;
+    }
+
+    var others = q.product.variants.some(function (v) { return v.available; });
+    var wrap = buildButton(
+      { productId: String(q.product.id), variants: [{ id: variant.id, title: variant.title }], pageType: pageKey() === "home" ? "index" : pageKey() },
+      { subtext: others ? cfg.button.mixedSubtext : "" },
+    );
+    var submit = q.form.querySelector('[type="submit"]');
+    var target = (submit && submit.parentElement) || q.form;
+    if (target === q.form) q.form.appendChild(wrap);
+    else target.insertAdjacentElement("afterend", wrap);
+    ensureCustomHide();
+    if (hideEnabled) q.form.setAttribute("data-tn-soldout", "");
+  }
+
+  function tickQuickForms() {
+    quickForms = quickForms.filter(function (q) { return q.form.isConnected; });
+    quickForms.forEach(function (q) {
+      if (!visible(q.form)) return; // a drawer that is closed costs nothing
+      var id = quickVariantId(q);
+      var variant = q.product.variants.filter(function (v) { return String(v.id) === id; })[0];
+      var soldOut = !!variant && !variant.available;
+      var hasButton = !!q.form.querySelector("[data-trekiva-notify-button]");
+      if (id !== q.current || soldOut !== hasButton) {
+        q.current = id;
+        renderQuick(q);
+      }
+    });
+    if (quickForms.length === 0) { window.clearInterval(quickTimer); quickTimer = null; }
+  }
+
+  function scanQuickForms() {
+    var forms = document.querySelectorAll('form[action*="/cart/add"]');
+    Array.prototype.forEach.call(forms, function (form) {
+      if (form.hasAttribute("data-trekiva-notify-form") || !form.querySelector('[name="id"]')) return;
+      var handle = handleForForm(form);
+      if (!handle) return; // not sure which product this is: better to leave the theme's button alone
+      form.setAttribute("data-trekiva-notify-form", handle);
+      fetchProduct(handle).then(function (p) {
+        if (!p || !form.isConnected || !ruleAllows({ id: p.id, tags: p.tags, collections: null })) return;
+        quickForms.push({ form: form, product: p, current: null });
+        if (!quickTimer) quickTimer = window.setInterval(tickQuickForms, 200);
+        tickQuickForms();
+      });
+    });
+  }
+
   function startCards() {
     scanCards();
+    scanQuickForms();
+    // Remember which card was clicked: that is the product of the drawer that opens next.
+    document.addEventListener("click", function (e) {
+      var card = e.target.closest && e.target.closest(customCard || DEFAULT_CARD);
+      var handle = handleOfLink(card);
+      if (handle) lastCard = { handle: handle, at: Date.now() };
+    }, true);
     var timer = null;
     new MutationObserver(function () {
       window.clearTimeout(timer);
-      timer = window.setTimeout(scanCards, 300);
+      timer = window.setTimeout(function () { scanCards(); scanQuickForms(); }, 250);
     }).observe(document.body, { childList: true, subtree: true });
   }
 

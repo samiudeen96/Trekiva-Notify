@@ -5,6 +5,12 @@ html[data-tn-soldout] form[action*="/cart/add"] button[name="add"],
 html[data-tn-soldout] .shopify-payment-button,
 html[data-tn-soldout] [data-shopify="payment-button"] { display: none !important; }
 
+/* The same inside one quick-buy drawer's form: only that form's buttons are replaced. */
+form[data-tn-soldout] [type="submit"],
+form[data-tn-soldout] button[name="add"],
+form[data-tn-soldout] .shopify-payment-button,
+form[data-tn-soldout] [data-shopify="payment-button"] { display: none !important; }
+
 .tn-wrap { margin: 12px 0; width: 100%; }
 .tn-btn {
   display: block; width: 100%; box-sizing: border-box; cursor: pointer;

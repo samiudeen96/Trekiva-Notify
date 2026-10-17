@@ -25,6 +25,7 @@ Use a development store, or a test product on your real store. Keep the Resend d
 
 ## Cards
 - [ ] Mark a whole product sold out. Collection page, search results and (if enabled) home page show a small Notify me button on its card.
+- [ ] Collection page, open a product's quick-buy drawer and pick a sold-out size: Notify Me replaces the "Sold out" button; pick an in-stock size and the theme's button returns.
 - [ ] Load more products (pagination or infinite scroll): new sold-out cards get the button too.
 - [ ] Editor → Product options: try "Specific products" and "Exclude tags" and confirm the button follows the rule.
 
