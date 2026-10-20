@@ -5,6 +5,10 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import { type EntryContext } from "react-router";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
+import { startScheduler } from "./scheduler.server";
+
+// Loaded once when the server boots: starts the in-process schedules (restock retries, reports, stock check).
+startScheduler();
 
 export const streamTimeout = 5000;
 

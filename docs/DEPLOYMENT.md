@@ -22,7 +22,7 @@ Fill in `.env`:
 - `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `SHOPIFY_APP_URL=https://notify.example.com`, `SERVER_NAME=notify.example.com`
 - `SCOPES=read_products,read_inventory,read_locations,read_orders` (must match `shopify.app.toml`)
 - `POSTGRES_PASSWORD=$(openssl rand -hex 24)` (hex keeps it URL-safe; compose builds `DATABASE_URL` from the `POSTGRES_*` values)
-- `CRON_SECRET=$(openssl rand -hex 24)`
+- `CRON_SECRET=$(openssl rand -hex 24)` (only needed if an external scheduler calls the cron endpoints)
 - `RESEND_API_KEY`, `EMAIL_FROM="Trekiva <notify@yourdomain.com>"` (address on the verified domain), optional `EMAIL_REPLY_TO`
 - `RESEND_WEBHOOK_SECRET` (step 5)
 
@@ -41,15 +41,16 @@ From the project folder on your laptop: `shopify app deploy`. This publishes the
 ## 5. Resend webhook
 Resend → Webhooks → Add endpoint: `https://notify.example.com/api/resend/webhook`, events **email.delivered**, **email.bounced**, **email.complained**. Copy the signing secret into `RESEND_WEBHOOK_SECRET` and restart: `docker compose up -d`.
 
-## 6. Scheduled calls
-On the VM, `crontab -e` (the app listens on `127.0.0.1:3000`; change the port if you changed `APP_PORT`):
+## 6. Scheduled jobs (nothing to set up)
+The app runs its own schedules while it is up: queued restock emails (retries) every minute, the report check every 10 minutes (each shop's own schedule decides whether a report is due), and the stock check for missed webhooks every 6 hours. After a restart a report that came due while the app was down is sent within a minute.
+
+Prefer an external scheduler? Set `DISABLE_SCHEDULER=true` and call the endpoints with `Authorization: Bearer $CRON_SECRET`:
 ```cron
 * * * * *  curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:3000/api/cron/process-jobs >/dev/null
 0 * * * *  curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:3000/api/cron/reports >/dev/null
 30 2 * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:3000/api/cron/reconcile >/dev/null
-0 3 * * *  /opt/trekiva-notify/Trekiva\ Notify/deploy/backup.sh
 ```
-Put `CRON_SECRET=...` at the top of the crontab (cron does not read `.env`).
+Either way, take a backup daily: `0 3 * * *  /opt/trekiva-notify/Trekiva\ Notify/deploy/backup.sh` (put `CRON_SECRET=...` at the top of the crontab if you use the endpoints).
 
 ## 7. Merchant setup
 1. Open the app. **Home → Setup guide**: step 1 opens the theme editor with the **Trekiva Notify** app embed ready to switch on; save the theme.
@@ -68,6 +69,6 @@ Put `CRON_SECRET=...` at the top of the crontab (cron does not read `.env`).
 
 ## 9. Known limits
 - The PDF report draws with the fonts in `assets/fonts/` (Noto Sans, SIL Open Font License); the Docker image copies them in. A PDF holds the latest 500 requests; the Excel file holds up to 50,000.
-- The rate limiter is in memory, so run a single app instance.
+- The rate limiter and the built-in schedules are in the app process, so run a single app instance.
 - Collection rules apply on product pages only; cards cannot tell which collections a product is in.
 - The "Delivered" status depends on the Resend webhook being configured.

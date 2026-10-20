@@ -25,14 +25,14 @@ npm run dev                   # shopify app dev
 ```
 Checks: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`. The unit tests need no database.
 
-## Scheduled calls
-Every call sends `Authorization: Bearer $CRON_SECRET`.
+## Scheduled jobs
+The server runs these itself (`app/scheduler.server.ts`): restock-email retries every minute, a report check every 10 minutes, and a stock check for missed webhooks every 6 hours. To use an external scheduler instead, set `DISABLE_SCHEDULER=true` and call these with `Authorization: Bearer $CRON_SECRET`:
 
-| Endpoint | Schedule | Purpose |
-|---|---|---|
-| `/api/cron/process-jobs` | every minute | retries failed sends, picks up leftover jobs |
-| `/api/cron/reports` | hourly | summary reports (each shop's own schedule decides) |
-| `/api/cron/reconcile` | nightly | notifies for restocks whose webhook was missed |
+| Endpoint | Suggested schedule |
+|---|---|
+| `/api/cron/process-jobs` | every minute |
+| `/api/cron/reports` | hourly |
+| `/api/cron/reconcile` | nightly |
 
 ## Layout
 - `app/routes/` admin pages (`app.*`), storefront API (`api.public.*`), cron (`api.cron.*`), webhooks (`webhooks.*`)

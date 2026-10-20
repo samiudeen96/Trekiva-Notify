@@ -30,6 +30,7 @@ export async function loadSettings(shopDomain: string) {
     reportWeekday: row?.reportWeekday ?? 2,
     reportMonthDay: row?.reportMonthDay ?? 1,
     reportFormat: (row?.reportFormat ?? "EXCEL") as "EXCEL" | "PDF" | "BOTH",
+    lastReportAt: row?.lastReportAt?.toISOString() ?? null,
     reportEmail: row?.reportEmail ?? "",
     reportCc: row?.reportCc ?? [],
     embedActivated: row?.embedActivated ?? false,

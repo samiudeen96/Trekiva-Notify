@@ -54,7 +54,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     reportCc: settings.reportCc,
   };
   const embedUrl = `https://${session.shop}/admin/themes/current/editor?context=apps&activateAppId=${env.SHOPIFY_API_KEY}/notify-embed`;
-  return { values, locations, timeZone, embedUrl, defaultFrom: env.EMAIL_FROM ?? "", resendReady: Boolean(env.RESEND_API_KEY && env.EMAIL_FROM) };
+  return { values, locations, timeZone, lastReportAt: settings.lastReportAt, embedUrl, defaultFrom: env.EMAIL_FROM ?? "", resendReady: Boolean(env.RESEND_API_KEY && env.EMAIL_FROM) };
 };
 
 const bodySchema = z.discriminatedUnion("intent", [
@@ -294,6 +294,12 @@ export default function Settings() {
                 </s-grid>
                 <s-text color="subdued">
                   {nextReport ? `Next report: ${nextReport}` : "Next report: shown once the page has loaded"} ({loaded.timeZone}, your store&apos;s time zone).
+                  {dirty ? " Save to apply this schedule." : ""}
+                </s-text>
+                <s-text color="subdued">
+                  {loaded.lastReportAt
+                    ? `Last checked: ${new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: loaded.timeZone }).format(new Date(loaded.lastReportAt))}. A report is only sent when there are new requests since then.`
+                    : "No report has been due yet."}
                 </s-text>
               </s-stack>
             </s-box>

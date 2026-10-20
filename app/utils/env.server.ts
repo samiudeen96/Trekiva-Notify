@@ -24,6 +24,9 @@ const schema = z.object({
     .enum(["silent", "fatal", "error", "warn", "info", "debug", "trace"])
     .default("info"),
   SUBSCRIBE_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(5),
+  // "true" turns off the schedules the server runs itself (restock retries, reports, stock check): use it when
+  // an external scheduler calls the /api/cron/* endpoints instead.
+  DISABLE_SCHEDULER: blankAsUnset(z.enum(["true", "false"])),
   // Protects /api/cron/* (job processor, nightly reconcile, summary reports).
   CRON_SECRET: blankAsUnset(z.string().min(16)),
   // Resend sends the restock emails. Optional so the admin can boot before Resend is configured;
