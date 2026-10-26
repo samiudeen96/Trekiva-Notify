@@ -10,7 +10,7 @@ import { Avatar, EmptyState, STATUS_LABEL, StatGrid, StatTile, StatusBadge } fro
 import { timeAgo } from "../utils/format";
 
 // Rows per page. The page numbers, the footer text and the query all use this one value.
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 const STATUSES = ["PENDING", "NOTIFIED", "UNSUBSCRIBED", "FAILED"] as const;
 type Status = (typeof STATUSES)[number];
 
